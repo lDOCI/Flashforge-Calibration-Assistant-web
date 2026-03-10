@@ -9,6 +9,13 @@ pip install paramiko pyinstaller -q
 
 pyinstaller --onefile --windowed ^
     --name "Flashforge Assistant" ^
+    --hidden-import paramiko ^
+    --hidden-import paramiko.transport ^
+    --hidden-import paramiko.sftp ^
+    --hidden-import paramiko.client ^
+    --hidden-import nacl ^
+    --hidden-import bcrypt ^
+    --hidden-import cryptography ^
     flashforge_gui.py
 
 echo.
