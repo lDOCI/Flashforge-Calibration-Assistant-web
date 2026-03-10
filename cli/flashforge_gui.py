@@ -2,37 +2,35 @@
 """
 Flashforge Calibration Assistant — GUI utility.
 Downloads printer.cfg and shaper CSVs via SSH,
-then opens the web app with data encoded in the URL.
+saves them locally, opens the folder and the web app.
 
-Build standalone exe:
-    pip install pyinstaller paramiko
-    pyinstaller --onefile --windowed flashforge_gui.py
+Build:
+    Mac:   pyinstaller --onefile --windowed --name "Flashforge Assistant" flashforge_gui.py
+    Win:   pyinstaller --onefile --windowed --name "Flashforge Assistant" --icon=icon.ico flashforge_gui.py
+
+Requirements:
+    pip install paramiko pyinstaller
 """
 
-import base64
-import gzip
 import json
 import os
+import platform
+import subprocess
 import sys
-import tempfile
 import threading
 import webbrowser
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 from pathlib import Path
 
 try:
     import paramiko
 except ImportError:
-    paramiko = None  # handled at runtime
-
+    paramiko = None
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-WEB_APP_URL = os.environ.get(
-    "FLASHFORGE_WEB_URL",
-    "https://ldoci.github.io/Flashforge-Calibration-Assistant-web/",
-)
+WEB_APP_URL = "https://ldoci.github.io/Flashforge-Calibration-Assistant-web/"
 
 CONFIG_FALLBACK_PATHS = [
     "/opt/config/printer.cfg",
@@ -40,56 +38,142 @@ CONFIG_FALLBACK_PATHS = [
     "/usr/data/config/printer.cfg",
 ]
 
-PRINTER_PRESETS = {
-    "Flashforge AD5M / AD5M Pro": {
-        "user": "root",
-        "config_path": "/opt/config/printer.cfg",
-        "shaper_dir": "/tmp",
-    },
-    "Flashforge 5X": {
-        "user": "root",
-        "config_path": "/opt/config/printer.cfg",
-        "shaper_dir": "/tmp",
-    },
-    "Custom": {
-        "user": "root",
-        "config_path": "/opt/config/printer.cfg",
-        "shaper_dir": "/tmp",
-    },
+SHAPER_DIR = "/tmp"
+
+if getattr(sys, "frozen", False):
+    _APP_DIR = Path(sys.executable).parent
+else:
+    _APP_DIR = Path(__file__).parent
+SETTINGS_FILE = _APP_DIR / ".flashforge_settings.json"
+
+# Output folder for downloaded files
+OUTPUT_DIR = Path.home() / "Flashforge Calibration"
+
+# ─── Localization ─────────────────────────────────────────────────────────────
+
+LANG_RU = {
+    "title": "Помощник Калибровки Flashforge",
+    "ip": "IP адрес принтера:",
+    "password": "Пароль:",
+    "show": "Показать",
+    "remember": "Запомнить пароль",
+    "shapers": "Скачать CSV шейперов (Input Shaper)",
+    "btn_go": "Скачать и открыть",
+    "btn_ready": "Готово. Введите IP принтера и нажмите «Скачать и открыть».",
+    "missing_paramiko": "paramiko не установлен.\n\nВыполните: pip install paramiko",
+    "missing_ip": "Введите IP адрес принтера.",
+    "connecting": "Подключение к root@{host} ...",
+    "connected": "Подключено.",
+    "trying": "Пробуем {path} ...",
+    "not_found": "  Не найден: {path}",
+    "cfg_found": "  printer.cfg: {size} байт",
+    "looking_shapers": "Ищем CSV шейперов в {dir} ...",
+    "no_shapers": "  CSV шейперов не найдено.",
+    "shaper_found": "  {name}: {size} байт",
+    "saved_to": "Файлы сохранены в: {path}",
+    "opening": "Открываю папку и браузер...",
+    "done": "Готово! Перетащите файлы из папки на сайт.",
+    "cfg_not_found": "printer.cfg не найден ни по одному пути:\n{paths}",
+    "error": "Ошибка подключения",
+}
+
+LANG_EN = {
+    "title": "Flashforge Calibration Assistant",
+    "ip": "Printer IP Address:",
+    "password": "Password:",
+    "show": "Show",
+    "remember": "Remember password",
+    "shapers": "Download shaper CSVs (Input Shaper)",
+    "btn_go": "Download & Open",
+    "btn_ready": "Ready. Enter your printer IP and click 'Download & Open'.",
+    "missing_paramiko": "paramiko is not installed.\n\nRun: pip install paramiko",
+    "missing_ip": "Please enter the printer IP address.",
+    "connecting": "Connecting to root@{host} ...",
+    "connected": "Connected.",
+    "trying": "Trying {path} ...",
+    "not_found": "  Not found: {path}",
+    "cfg_found": "  printer.cfg: {size} bytes",
+    "looking_shapers": "Looking for shaper CSVs in {dir} ...",
+    "no_shapers": "  No shaper CSVs found.",
+    "shaper_found": "  {name}: {size} bytes",
+    "saved_to": "Files saved to: {path}",
+    "opening": "Opening folder and browser...",
+    "done": "Done! Drag files from the folder onto the website.",
+    "cfg_not_found": "printer.cfg not found at any known path:\n{paths}",
+    "error": "Connection Error",
 }
 
 
-# ─── SSH / Payload logic ─────────────────────────────────────────────────────
-
-def download_file_ssh(sftp, remote_path: str) -> str:
-    """Download a remote file via SFTP and return contents."""
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tmp:
-        tmp_path = tmp.name
+def detect_lang() -> dict:
+    """Auto-detect language: Russian if system locale starts with 'ru'."""
+    import locale
     try:
-        sftp.get(remote_path, tmp_path)
-        with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-    finally:
-        os.unlink(tmp_path)
+        lang = locale.getdefaultlocale()[0] or ""
+    except Exception:
+        lang = ""
+    return LANG_RU if lang.lower().startswith("ru") else LANG_EN
 
 
-def find_shaper_csvs(sftp, remote_dir: str) -> list:
-    """Find shaper CSV files in a directory."""
-    results = []
+L = detect_lang()
+
+
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+def load_settings() -> dict:
     try:
-        for entry in sftp.listdir(remote_dir):
-            if entry.endswith(".csv") and entry.startswith("calibration_data_"):
-                results.append(os.path.join(remote_dir, entry))
-    except IOError:
+        return json.loads(SETTINGS_FILE.read_text("utf-8"))
+    except Exception:
+        return {}
+
+
+def save_settings(data: dict):
+    try:
+        SETTINGS_FILE.write_text(json.dumps(data, indent=2), "utf-8")
+    except Exception:
         pass
-    return sorted(results)
 
 
-def encode_payload(data: dict) -> str:
-    """Compress and base64url-encode for URL transport."""
-    raw = json.dumps(data, separators=(",", ":")).encode("utf-8")
-    compressed = gzip.compress(raw, compresslevel=9)
-    return base64.urlsafe_b64encode(compressed).rstrip(b"=").decode("ascii")
+# ─── SSH ──────────────────────────────────────────────────────────────────────
+
+def ssh_connect(host: str, password: str):
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(
+        hostname=host, port=22, username="root",
+        password=password if password else None,
+        timeout=10,
+        allow_agent=False,
+        look_for_keys=False,
+        disabled_algorithms={"kex": ["kex-strict-c2s-v00@openssh.com"]},
+    )
+    return client
+
+
+def ssh_read_file(client, remote_path: str) -> str:
+    _, stdout, _ = client.exec_command(f"cat '{remote_path}'", timeout=10)
+    if stdout.channel.recv_exit_status() != 0:
+        raise FileNotFoundError(remote_path)
+    return stdout.read().decode("utf-8", errors="replace")
+
+
+def ssh_list_files(client, pattern: str) -> list:
+    _, stdout, _ = client.exec_command(f"ls -1 {pattern} 2>/dev/null", timeout=10)
+    stdout.channel.recv_exit_status()
+    output = stdout.read().decode("utf-8").strip()
+    return sorted(output.splitlines()) if output else []
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def open_folder(path: Path):
+    """Open a folder in the system file manager."""
+    system = platform.system()
+    if system == "Darwin":
+        subprocess.Popen(["open", str(path)])
+    elif system == "Windows":
+        os.startfile(str(path))
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
 
 
 # ─── GUI ──────────────────────────────────────────────────────────────────────
@@ -97,23 +181,18 @@ def encode_payload(data: dict) -> str:
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Flashforge Calibration Assistant")
+        self.title(L["title"])
         self.resizable(False, False)
         self.configure(bg="#1e1e2e")
         self._build_ui()
+        self._load_saved_settings()
         self._center_window()
-
-    # ── UI ────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         style = ttk.Style()
         style.theme_use("clam")
-        # Dark theme colors
-        bg = "#1e1e2e"
-        fg = "#cdd6f4"
-        field_bg = "#313244"
-        accent = "#89b4fa"
-        btn_bg = "#45475a"
+        bg, fg = "#1e1e2e", "#cdd6f4"
+        field_bg, accent, btn_bg = "#313244", "#89b4fa", "#45475a"
 
         style.configure(".", background=bg, foreground=fg, fieldbackground=field_bg)
         style.configure("TLabel", background=bg, foreground=fg, font=("Segoe UI", 10))
@@ -124,78 +203,54 @@ class App(tk.Tk):
                         font=("Segoe UI", 10, "bold"), padding=(12, 6))
         style.map("Accent.TButton",
                   background=[("active", "#b4d0fb"), ("disabled", "#585b70")])
-        style.configure("Secondary.TButton", background=btn_bg, foreground=fg,
-                        font=("Segoe UI", 9), padding=(8, 4))
 
         pad = {"padx": 12, "pady": 4}
         main = ttk.Frame(self, padding=16)
         main.pack(fill="both", expand=True)
 
-        # Header
-        ttk.Label(main, text="Flashforge Calibration Assistant",
-                  style="Header.TLabel").grid(row=0, column=0, columnspan=3, pady=(0, 12))
+        ttk.Label(main, text=L["title"],
+                  style="Header.TLabel").grid(row=0, column=0, columnspan=2, pady=(0, 12))
 
-        # Printer preset
-        ttk.Label(main, text="Printer:").grid(row=1, column=0, sticky="w", **pad)
-        self.preset_var = tk.StringVar(value=list(PRINTER_PRESETS.keys())[0])
-        preset_cb = ttk.Combobox(main, textvariable=self.preset_var,
-                                 values=list(PRINTER_PRESETS.keys()),
-                                 state="readonly", width=32)
-        preset_cb.grid(row=1, column=1, columnspan=2, sticky="ew", **pad)
-        preset_cb.bind("<<ComboboxSelected>>", self._on_preset_change)
-
-        # Host
-        ttk.Label(main, text="IP Address:").grid(row=2, column=0, sticky="w", **pad)
+        # IP
+        ttk.Label(main, text=L["ip"]).grid(row=1, column=0, sticky="w", **pad)
         self.host_var = tk.StringVar()
         ttk.Entry(main, textvariable=self.host_var, width=35).grid(
-            row=2, column=1, columnspan=2, sticky="ew", **pad)
-
-        # Username
-        ttk.Label(main, text="Username:").grid(row=3, column=0, sticky="w", **pad)
-        self.user_var = tk.StringVar(value="root")
-        ttk.Entry(main, textvariable=self.user_var, width=35).grid(
-            row=3, column=1, columnspan=2, sticky="ew", **pad)
+            row=1, column=1, sticky="ew", **pad)
 
         # Password
-        ttk.Label(main, text="Password:").grid(row=4, column=0, sticky="w", **pad)
+        ttk.Label(main, text=L["password"]).grid(row=2, column=0, sticky="w", **pad)
         self.pass_var = tk.StringVar()
-        self.pass_entry = ttk.Entry(main, textvariable=self.pass_var, show="*", width=35)
-        self.pass_entry.grid(row=4, column=1, sticky="ew", **pad)
+        pass_frame = ttk.Frame(main)
+        pass_frame.grid(row=2, column=1, sticky="ew", **pad)
+        self.pass_entry = ttk.Entry(pass_frame, textvariable=self.pass_var, show="*", width=28)
+        self.pass_entry.pack(side="left", fill="x", expand=True)
         self.show_pass = tk.BooleanVar(value=False)
-        ttk.Checkbutton(main, text="Show", variable=self.show_pass,
-                        command=self._toggle_pass).grid(row=4, column=2)
+        ttk.Checkbutton(pass_frame, text=L["show"], variable=self.show_pass,
+                        command=self._toggle_pass).pack(side="left", padx=(4, 0))
 
-        # Config path
-        ttk.Label(main, text="Config path:").grid(row=5, column=0, sticky="w", **pad)
-        self.cfg_var = tk.StringVar(value=PRINTER_PRESETS[self.preset_var.get()]["config_path"])
-        ttk.Entry(main, textvariable=self.cfg_var, width=35).grid(
-            row=5, column=1, columnspan=2, sticky="ew", **pad)
+        # Remember
+        self.remember_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(main, text=L["remember"],
+                        variable=self.remember_var).grid(
+            row=3, column=1, sticky="w", padx=12, pady=(2, 4))
 
-        # Shapers checkbox
+        # Shapers
         self.shapers_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(main, text="Also download shaper CSVs (Input Shaper)",
+        ttk.Checkbutton(main, text=L["shapers"],
                         variable=self.shapers_var).grid(
-            row=6, column=0, columnspan=3, sticky="w", padx=12, pady=(8, 4))
+            row=4, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 4))
 
-        # ── Buttons ──
-        btn_frame = ttk.Frame(main)
-        btn_frame.grid(row=7, column=0, columnspan=3, pady=(12, 4))
-
-        self.btn_go = ttk.Button(btn_frame, text="Download & Open in Browser",
+        # Button
+        self.btn_go = ttk.Button(main, text=L["btn_go"],
                                  style="Accent.TButton", command=self._on_go)
-        self.btn_go.pack(side="left", padx=4)
+        self.btn_go.grid(row=5, column=0, columnspan=2, pady=(12, 4))
 
-        ttk.Button(btn_frame, text="Load local files",
-                   style="Secondary.TButton",
-                   command=self._on_local).pack(side="left", padx=4)
-
-        # ── Status log ──
+        # Log
         self.log_text = tk.Text(main, height=8, width=52, bg="#181825", fg="#a6adc8",
                                 font=("Consolas", 9), relief="flat", state="disabled",
                                 wrap="word")
-        self.log_text.grid(row=8, column=0, columnspan=3, pady=(8, 0), sticky="ew")
-
-        self._log("Ready. Enter your printer IP and click 'Download & Open'.")
+        self.log_text.grid(row=6, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        self._log(L["btn_ready"])
 
     def _center_window(self):
         self.update_idletasks()
@@ -203,11 +258,6 @@ class App(tk.Tk):
         x = (self.winfo_screenwidth() - w) // 2
         y = (self.winfo_screenheight() - h) // 2
         self.geometry(f"+{x}+{y}")
-
-    def _on_preset_change(self, _=None):
-        preset = PRINTER_PRESETS[self.preset_var.get()]
-        self.user_var.set(preset["user"])
-        self.cfg_var.set(preset["config_path"])
 
     def _toggle_pass(self):
         self.pass_entry.configure(show="" if self.show_pass.get() else "*")
@@ -218,157 +268,107 @@ class App(tk.Tk):
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
 
-    # ── SSH download ─────────────────────────────────────────────────────
+    def _load_saved_settings(self):
+        s = load_settings()
+        if s.get("host"):
+            self.host_var.set(s["host"])
+        if s.get("password"):
+            self.pass_var.set(s["password"])
+            self.remember_var.set(True)
+        if "shapers" in s:
+            self.shapers_var.set(s["shapers"])
+
+    def _save_current_settings(self):
+        s = {"host": self.host_var.get().strip(), "shapers": self.shapers_var.get()}
+        if self.remember_var.get():
+            s["password"] = self.pass_var.get()
+        save_settings(s)
 
     def _on_go(self):
         if paramiko is None:
-            messagebox.showerror("Missing dependency",
-                                 "paramiko is not installed.\n\n"
-                                 "Run:  pip install paramiko")
+            messagebox.showerror(L["error"], L["missing_paramiko"])
             return
 
         host = self.host_var.get().strip()
         if not host:
-            messagebox.showwarning("Missing IP", "Please enter the printer IP address.")
+            messagebox.showwarning(L["error"], L["missing_ip"])
             return
 
-        user = self.user_var.get().strip() or "root"
         password = self.pass_var.get()
-        config_path = self.cfg_var.get().strip()
         include_shapers = self.shapers_var.get()
-        preset = PRINTER_PRESETS[self.preset_var.get()]
-        shaper_dir = preset.get("shaper_dir", "/tmp")
+        self._save_current_settings()
 
         self.btn_go.configure(state="disabled")
-        self._log(f"\nConnecting to {user}@{host} ...")
+        self._log(f"\n{L['connecting'].format(host=host)}")
 
         def worker():
             try:
-                client = paramiko.SSHClient()
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                # Flashforge uses dropbear — disable strict kex for compatibility
-                connect_kwargs = dict(
-                    hostname=host, port=22, username=user,
-                    password=password if password else None,
-                    timeout=10,
-                    allow_agent=False,
-                    look_for_keys=False,
-                )
-                # paramiko ≥3.4 supports disabled_algorithms to skip strict kex
-                try:
-                    connect_kwargs["disabled_algorithms"] = {
-                        "kex": ["strict-kex-v00@openssh.com"]
-                    }
-                except Exception:
-                    pass
-                client.connect(**connect_kwargs)
-                self.after(0, lambda: self._log("Connected."))
+                client = ssh_connect(host, password)
+                self.after(0, lambda: self._log(L["connected"]))
 
-                sftp = client.open_sftp()
-                payload = {"version": 1, "configs": [], "shaperCsvs": []}
+                # Prepare output folder
+                OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-                # Download printer.cfg — try user-specified path, then fallbacks
-                paths_to_try = [config_path] + [
-                    p for p in CONFIG_FALLBACK_PATHS if p != config_path
-                ]
+                # Download printer.cfg
                 cfg_content = None
-                used_path = config_path
-                for try_path in paths_to_try:
+                for try_path in CONFIG_FALLBACK_PATHS:
                     try:
-                        self.after(0, lambda p=try_path: self._log(f"Trying {p} ..."))
-                        cfg_content = download_file_ssh(sftp, try_path)
-                        used_path = try_path
+                        self.after(0, lambda p=try_path: self._log(
+                            L["trying"].format(path=p)))
+                        cfg_content = ssh_read_file(client, try_path)
                         break
-                    except (IOError, FileNotFoundError):
-                        self.after(0, lambda p=try_path: self._log(f"  Not found: {p}"))
+                    except (FileNotFoundError, Exception):
+                        self.after(0, lambda p=try_path: self._log(
+                            L["not_found"].format(path=p)))
 
                 if cfg_content is None:
-                    raise FileNotFoundError(
-                        "printer.cfg not found at any known path:\n"
-                        + "\n".join(f"  • {p}" for p in paths_to_try)
-                    )
+                    paths = "\n".join(f"  - {p}" for p in CONFIG_FALLBACK_PATHS)
+                    raise FileNotFoundError(L["cfg_not_found"].format(paths=paths))
 
-                payload["configs"].append({
-                    "name": Path(used_path).name,
-                    "content": cfg_content,
-                })
-                self.after(0, lambda: self._log(
-                    f"  printer.cfg: {len(cfg_content):,} bytes"))
+                cfg_file = OUTPUT_DIR / "printer.cfg"
+                cfg_file.write_text(cfg_content, encoding="utf-8")
+                size = len(cfg_content)
+                self.after(0, lambda s=size: self._log(
+                    L["cfg_found"].format(size=f"{s:,}")))
 
                 # Shaper CSVs
                 if include_shapers:
-                    self.after(0, lambda: self._log(f"Looking for shaper CSVs in {shaper_dir} ..."))
-                    csv_files = find_shaper_csvs(sftp, shaper_dir)
+                    self.after(0, lambda: self._log(
+                        L["looking_shapers"].format(dir=SHAPER_DIR)))
+                    csv_files = ssh_list_files(
+                        client, f"{SHAPER_DIR}/calibration_data_*.csv")
                     if not csv_files:
-                        self.after(0, lambda: self._log("  No shaper CSVs found."))
+                        self.after(0, lambda: self._log(L["no_shapers"]))
                     for csv_path in csv_files:
-                        csv_content = download_file_ssh(sftp, csv_path)
+                        csv_content = ssh_read_file(client, csv_path)
                         name = Path(csv_path).name
-                        payload["shaperCsvs"].append({
-                            "name": name,
-                            "content": csv_content,
-                        })
+                        (OUTPUT_DIR / name).write_text(csv_content, encoding="utf-8")
                         self.after(0, lambda n=name, s=len(csv_content):
-                                   self._log(f"  {n}: {s:,} bytes"))
+                                   self._log(L["shaper_found"].format(
+                                       name=n, size=f"{s:,}")))
 
-                sftp.close()
                 client.close()
 
-                # Encode & open
-                encoded = encode_payload(payload)
-                url = f"{WEB_APP_URL.rstrip('/')}/?data={encoded}"
-                self.after(0, lambda: self._log(
-                    f"Payload: {len(encoded):,} chars. Opening browser..."))
-                webbrowser.open(url)
-                self.after(0, lambda: self._log("Done! Data loaded in the web app."))
+                out = str(OUTPUT_DIR)
+                self.after(0, lambda o=out: self._log(L["saved_to"].format(path=o)))
+                self.after(0, lambda: self._log(L["opening"]))
+
+                # Open folder and browser
+                open_folder(OUTPUT_DIR)
+                web_url = WEB_APP_URL if L is LANG_EN else WEB_APP_URL
+                webbrowser.open(web_url)
+
+                self.after(0, lambda: self._log(L["done"]))
 
             except Exception as e:
-                self.after(0, lambda: self._log(f"ERROR: {e}"))
-                self.after(0, lambda: messagebox.showerror("Connection Error", str(e)))
+                err_msg = str(e)
+                self.after(0, lambda m=err_msg: self._log(f"ERROR: {m}"))
+                self.after(0, lambda m=err_msg: messagebox.showerror(L["error"], m))
             finally:
                 self.after(0, lambda: self.btn_go.configure(state="normal"))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    # ── Local file loading ───────────────────────────────────────────────
-
-    def _on_local(self):
-        """Pick local .cfg / .csv files and open the web app."""
-        files = filedialog.askopenfilenames(
-            title="Select printer.cfg and/or shaper CSVs",
-            filetypes=[
-                ("Config & CSV", "*.cfg *.conf *.csv"),
-                ("All files", "*.*"),
-            ],
-        )
-        if not files:
-            return
-
-        payload = {"version": 1, "configs": [], "shaperCsvs": []}
-        for fpath in files:
-            name = Path(fpath).name
-            with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-
-            if name.endswith((".cfg", ".conf")):
-                payload["configs"].append({"name": name, "content": content})
-                self._log(f"Loaded config: {name}")
-            elif name.endswith(".csv"):
-                payload["shaperCsvs"].append({"name": name, "content": content})
-                self._log(f"Loaded shaper: {name}")
-
-        if not payload["configs"] and not payload["shaperCsvs"]:
-            self._log("No valid files selected.")
-            return
-
-        encoded = encode_payload(payload)
-        url = f"{WEB_APP_URL.rstrip('/')}/?data={encoded}"
-        self._log(f"Payload: {len(encoded):,} chars. Opening browser...")
-        webbrowser.open(url)
-        self._log("Done!")
-
-
-# ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     app = App()
