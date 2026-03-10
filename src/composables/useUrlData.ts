@@ -1,4 +1,5 @@
 import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { decodePayload, type CompactMesh } from '@/lib/urlCodec'
 import { useBedStore } from '@/stores/bed'
 import { useShaperStore } from '@/stores/shaper'
@@ -22,20 +23,20 @@ function compactToMeshData(c: CompactMesh): MeshData {
 }
 
 export function useUrlData() {
+  const router = useRouter()
+
   onMounted(async () => {
-    // Hash router: params are after #/?data=... not in window.location.search
-    const hash = window.location.hash
-    const qIdx = hash.indexOf('?')
-    const params = qIdx >= 0 ? new URLSearchParams(hash.slice(qIdx)) : new URLSearchParams()
-    const data = params.get('data')
+    await router.isReady()
+    const route = router.currentRoute.value
+    const data = (route.query.data as string) || null
     if (!data) return
 
     try {
       const payload = await decodePayload(data)
       const bedStore = useBedStore()
 
-      // v2 compact format — mesh data only, much shorter URLs
-      if (payload.version === 2 && payload.compact) {
+      // v2/v3 compact format — mesh data only
+      if (payload.compact && payload.compact.length > 0) {
         for (const cm of payload.compact) {
           const meshData = compactToMeshData(cm)
           bedStore.loadFromMeshData(meshData, cm.n)
@@ -60,9 +61,8 @@ export function useUrlData() {
         }
       }
 
-      // Clean URL — remove data param from hash, keep route
-      const hashPath = hash.split('?')[0] || '#/'
-      window.history.replaceState(null, '', window.location.pathname + hashPath)
+      // Clean URL — remove data param, keep route
+      router.replace({ path: route.path })
     } catch (e) {
       console.error('Failed to decode URL data:', e)
     }
