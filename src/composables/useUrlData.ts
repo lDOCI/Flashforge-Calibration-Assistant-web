@@ -22,14 +22,47 @@ function compactToMeshData(c: CompactMesh): MeshData {
   }
 }
 
+/** Load decoded payload into stores */
+function loadPayload(payload: any) {
+  const bedStore = useBedStore()
+
+  // v2/v3 compact format — mesh data only
+  if (payload.compact && payload.compact.length > 0) {
+    for (const cm of payload.compact) {
+      const meshData = compactToMeshData(cm)
+      bedStore.loadFromMeshData(meshData, cm.n)
+    }
+  }
+
+  // v1 / legacy formats: full config content
+  if (payload.configs || payload.meshes) {
+    const configs = payload.configs ?? payload.meshes ?? []
+    for (const cfg of configs) {
+      const content = cfg.content ?? cfg.configContent
+      const name = cfg.name ?? 'printer.cfg'
+      if (content) {
+        bedStore.loadFromConfig(content, name.replace(/\.(cfg|conf)$/, ''), name)
+      }
+    }
+  }
+
+  if (payload.shaperCsvs) {
+    const shaperStore = useShaperStore()
+    for (const csv of payload.shaperCsvs) {
+      const axis = csv.axis ?? (csv.name?.toLowerCase().includes('_x') ? 'x' : 'y')
+      shaperStore.loadCsv(axis, csv.content)
+    }
+  }
+}
+
 export function useUrlData() {
   const router = useRouter()
 
   onMounted(async () => {
     await router.isReady()
-    // Check window.location.search first (Telegram and other apps strip #hash)
-    // then fall back to hash-based query (legacy share links)
     const route = router.currentRoute.value
+
+    // Data encoded in URL (share links)
     const data = new URLSearchParams(window.location.search).get('data')
       || (route.query.data as string)
       || null
@@ -37,35 +70,7 @@ export function useUrlData() {
 
     try {
       const payload = await decodePayload(data)
-      const bedStore = useBedStore()
-
-      // v2/v3 compact format — mesh data only
-      if (payload.compact && payload.compact.length > 0) {
-        for (const cm of payload.compact) {
-          const meshData = compactToMeshData(cm)
-          bedStore.loadFromMeshData(meshData, cm.n)
-        }
-      } else {
-        // v1 / legacy formats: full config content
-        const configs = payload.configs ?? payload.meshes ?? []
-        for (const cfg of configs) {
-          const content = (cfg as any).content ?? (cfg as any).configContent
-          const name = cfg.name ?? 'printer.cfg'
-          if (content) {
-            bedStore.loadFromConfig(content, name.replace(/\.(cfg|conf)$/, ''), name)
-          }
-        }
-      }
-
-      if (payload.shaperCsvs) {
-        const shaperStore = useShaperStore()
-        for (const csv of payload.shaperCsvs) {
-          const axis = csv.axis ?? (csv.name?.toLowerCase().includes('_x') ? 'x' : 'y')
-          shaperStore.loadCsv(axis, csv.content)
-        }
-      }
-
-      // Clean URL — remove ?data= from search and hash
+      loadPayload(payload)
       const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || '#/')
       window.history.replaceState(null, '', cleanUrl)
     } catch (e) {

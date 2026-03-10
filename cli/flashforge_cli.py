@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
 Flashforge Calibration CLI — downloads printer data via SSH
-and opens the web calibration assistant with the data encoded in the URL.
+and saves files locally for use with the web calibration tool.
 
 Usage:
-    python flashforge_cli.py --host 192.168.1.100 [--user root] [--password <pwd>] [--shapers]
+    python flashforge_cli.py --host 192.168.1.100 [--password <pwd>] [--shapers]
 
 Requirements:
     pip install paramiko
 """
 
 import argparse
-import base64
-import gzip
-import json
 import os
+import platform
+import subprocess
 import sys
-import tempfile
 import webbrowser
 from pathlib import Path
 
@@ -26,151 +24,109 @@ except ImportError:
     print("ERROR: paramiko is required. Install with: pip install paramiko")
     sys.exit(1)
 
-
-# Default paths on Flashforge printers
-DEFAULT_CONFIG_PATH = "/opt/config/printer.cfg"
 CONFIG_FALLBACK_PATHS = [
     "/opt/config/printer.cfg",
     "/root/printer_data/config/printer.cfg",
     "/usr/data/config/printer.cfg",
 ]
-DEFAULT_SHAPER_DIR = "/tmp"
-DEFAULT_USER = "root"
-DEFAULT_PORT = 22
-
-# Where the web app is hosted (change after deploying to your GitHub Pages)
-WEB_APP_URL = os.environ.get(
-    "FLASHFORGE_WEB_URL",
-    "https://ldoci.github.io/Flashforge-Calibration-Assistant-web/",
-)
+SHAPER_DIR = "/tmp"
+WEB_APP_URL = "https://ldoci.github.io/Flashforge-Calibration-Assistant-web/"
+OUTPUT_DIR = Path.home() / "Flashforge Calibration"
 
 
-def connect_ssh(host: str, port: int, user: str, password: str | None = None,
-                key_file: str | None = None) -> paramiko.SSHClient:
-    """Establish an SSH connection to the printer."""
+def ssh_connect(host: str, port: int, password: str | None):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    kwargs: dict = {"hostname": host, "port": port, "username": user}
-    if key_file:
-        kwargs["key_filename"] = key_file
-    elif password:
-        kwargs["password"] = password
-
-    print(f"Connecting to {user}@{host}:{port} ...")
-    client.connect(**kwargs)
+    print(f"Connecting to root@{host}:{port} ...")
+    client.connect(
+        hostname=host, port=port, username="root",
+        password=password, timeout=10,
+        allow_agent=False, look_for_keys=False,
+        disabled_algorithms={"kex": ["kex-strict-c2s-v00@openssh.com"]},
+    )
     print("Connected.")
     return client
 
 
-def download_file(sftp: paramiko.SFTPClient, remote_path: str) -> str:
-    """Download a remote file and return its contents as a string."""
-    print(f"  Downloading {remote_path} ...")
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".tmp", delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        sftp.get(remote_path, tmp_path)
-        with open(tmp_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-    finally:
-        os.unlink(tmp_path)
+def ssh_read_file(client, remote_path: str) -> str:
+    _, stdout, _ = client.exec_command(f"cat '{remote_path}'", timeout=10)
+    if stdout.channel.recv_exit_status() != 0:
+        raise FileNotFoundError(remote_path)
+    return stdout.read().decode("utf-8", errors="replace")
 
 
-def find_shaper_csvs(sftp: paramiko.SFTPClient, remote_dir: str) -> list[str]:
-    """Find shaper CSV files in the given directory."""
-    results = []
-    try:
-        for entry in sftp.listdir(remote_dir):
-            if entry.endswith(".csv") and entry.startswith("calibration_data_"):
-                results.append(os.path.join(remote_dir, entry))
-    except IOError:
-        pass
-    return sorted(results)
+def ssh_list_files(client, pattern: str) -> list:
+    _, stdout, _ = client.exec_command(f"ls -1 {pattern} 2>/dev/null", timeout=10)
+    stdout.channel.recv_exit_status()
+    output = stdout.read().decode("utf-8").strip()
+    return sorted(output.splitlines()) if output else []
 
 
-def encode_payload(data: dict) -> str:
-    """Compress and base64url-encode the payload for URL transport."""
-    json_bytes = json.dumps(data, separators=(",", ":")).encode("utf-8")
-    compressed = gzip.compress(json_bytes, compresslevel=9)
-
-    # base64url encoding (URL-safe, no padding)
-    encoded = base64.urlsafe_b64encode(compressed).rstrip(b"=").decode("ascii")
-    return encoded
+def open_folder(path: Path):
+    system = platform.system()
+    if system == "Darwin":
+        subprocess.Popen(["open", str(path)])
+    elif system == "Windows":
+        os.startfile(str(path))
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download printer data and open the web calibration tool."
+        description="Download printer data via SSH for the web calibration tool."
     )
-    parser.add_argument("--host", required=True, help="Printer IP address or hostname")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="SSH port")
-    parser.add_argument("--user", default=DEFAULT_USER, help="SSH username")
-    parser.add_argument("--password", default=None, help="SSH password")
-    parser.add_argument("--key", default=None, help="Path to SSH private key")
-    parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH,
-                        help="Remote path to printer.cfg")
+    parser.add_argument("--host", required=True, help="Printer IP address")
+    parser.add_argument("--port", type=int, default=22)
+    parser.add_argument("--password", default=None)
     parser.add_argument("--shapers", action="store_true",
                         help="Also download shaper CSV files")
-    parser.add_argument("--shaper-dir", default=DEFAULT_SHAPER_DIR,
-                        help="Remote directory for shaper CSVs")
-    parser.add_argument("--url", default=None,
-                        help="Override web app URL")
     parser.add_argument("--no-open", action="store_true",
-                        help="Print URL instead of opening browser")
-
+                        help="Don't open folder/browser")
     args = parser.parse_args()
-    web_url = args.url or WEB_APP_URL
 
-    # Connect
-    client = connect_ssh(args.host, args.port, args.user, args.password, args.key)
-    sftp = client.open_sftp()
-
-    payload: dict = {"version": 1, "configs": [], "shaperCsvs": []}
+    client = ssh_connect(args.host, args.port, args.password)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     try:
         # Download printer.cfg
-        config_content = download_file(sftp, args.config_path)
-        payload["configs"].append({
-            "name": Path(args.config_path).name,
-            "content": config_content,
-        })
-        print(f"  printer.cfg: {len(config_content)} bytes")
+        cfg_content = None
+        for try_path in CONFIG_FALLBACK_PATHS:
+            try:
+                print(f"  Trying {try_path} ...")
+                cfg_content = ssh_read_file(client, try_path)
+                print(f"  Found! {len(cfg_content):,} bytes")
+                break
+            except FileNotFoundError:
+                print(f"  Not found: {try_path}")
 
-        # Optionally download shaper CSVs
+        if cfg_content is None:
+            print("ERROR: printer.cfg not found")
+            sys.exit(1)
+
+        (OUTPUT_DIR / "printer.cfg").write_text(cfg_content, encoding="utf-8")
+
+        # Shaper CSVs
         if args.shapers:
-            csv_files = find_shaper_csvs(sftp, args.shaper_dir)
+            csv_files = ssh_list_files(client, f"{SHAPER_DIR}/calibration_data_*.csv")
             if not csv_files:
                 print("  No shaper CSV files found.")
             for csv_path in csv_files:
-                csv_content = download_file(sftp, csv_path)
-                payload["shaperCsvs"].append({
-                    "name": Path(csv_path).name,
-                    "content": csv_content,
-                })
-                print(f"  {Path(csv_path).name}: {len(csv_content)} bytes")
+                content = ssh_read_file(client, csv_path)
+                name = Path(csv_path).name
+                (OUTPUT_DIR / name).write_text(content, encoding="utf-8")
+                print(f"  {name}: {len(content):,} bytes")
 
     finally:
-        sftp.close()
         client.close()
         print("Disconnected.")
 
-    # Encode payload
-    encoded = encode_payload(payload)
-    full_url = f"{web_url.rstrip('/')}/?data={encoded}"
+    print(f"\nFiles saved to: {OUTPUT_DIR}")
 
-    print(f"\nPayload size: {len(encoded)} chars (base64url)")
-
-    if len(full_url) > 100_000:
-        print(f"WARNING: URL is {len(full_url)} characters. "
-              "Some browsers may not handle URLs this large.")
-
-    if args.no_open:
-        print(f"\nURL:\n{full_url}")
-    else:
-        print("Opening browser...")
-        webbrowser.open(full_url)
-        print("Done! The web app should load your data automatically.")
+    if not args.no_open:
+        open_folder(OUTPUT_DIR)
+        webbrowser.open(WEB_APP_URL)
+        print("Done! Drag files from the folder onto the website.")
 
 
 if __name__ == "__main__":

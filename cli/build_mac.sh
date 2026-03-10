@@ -1,0 +1,17 @@
+#!/bin/bash
+# Build standalone Mac app
+# Requirements: pip install paramiko pyinstaller
+
+set -e
+cd "$(dirname "$0")"
+
+echo "Building Flashforge Assistant for macOS..."
+pip install paramiko pyinstaller -q
+
+pyinstaller --onefile --windowed \
+    --name "Flashforge Assistant" \
+    flashforge_gui.py
+
+echo ""
+echo "Done! App is at: dist/Flashforge Assistant.app"
+echo "You can move it to /Applications or distribute the .app bundle."

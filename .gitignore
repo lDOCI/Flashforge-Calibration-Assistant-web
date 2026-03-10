@@ -24,3 +24,4 @@ src/**/*.vue.js
 # Env
 .env
 .env.*
+cli/.flashforge_settings.json
