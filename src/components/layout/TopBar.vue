@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/app'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
+const emit = defineEmits<{ 'toggle-menu': [] }>()
 
 function toggleTheme() {
   appStore.toggleTheme()
@@ -18,6 +19,9 @@ function toggleLang() {
 <template>
   <header class="topbar">
     <div class="topbar-left">
+      <button class="burger" @click="emit('toggle-menu')">
+        <span /><span /><span />
+      </button>
       <img class="topbar-logo" src="/favicon.svg" alt="Logo" />
       <span class="topbar-title">{{ t('neo_ui.top_bar.title') }}</span>
     </div>
@@ -50,6 +54,24 @@ function toggleLang() {
   gap: 12px;
 }
 
+.burger {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.burger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+}
+
 .topbar-logo {
   width: 30px;
   height: 30px;
@@ -66,5 +88,19 @@ function toggleLang() {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+@media (max-width: 768px) {
+  .burger {
+    display: flex;
+  }
+
+  .topbar-title {
+    font-size: 12px;
+  }
+
+  .topbar {
+    padding: 0 12px;
+  }
 }
 </style>

@@ -20,7 +20,6 @@ const { triggerFileInput } = useFileLoader()
       >
         {{ ws.name }}
         <span
-          v-if="bedStore.workspaces.length > 1"
           class="ws-close"
           @click.stop="bedStore.removeWorkspace(idx)"
         >&times;</span>

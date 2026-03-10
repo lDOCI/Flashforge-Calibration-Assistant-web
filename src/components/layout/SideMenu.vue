@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const emit = defineEmits<{ navigate: [] }>()
 
 const navItems = [
   { to: '/', label: 'neo_ui.nav.bed' },
@@ -50,6 +51,7 @@ function onAuthorClick() {
         :to="item.to"
         class="nav-item"
         active-class="nav-item--active"
+        @click="emit('navigate')"
       >
         {{ t(item.label) }}
       </router-link>
@@ -262,5 +264,23 @@ function onAuthorClick() {
 @keyframes egg-pop {
   from { opacity: 0; transform: scale(0.7) translateY(10px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .sidemenu {
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: none;
+  }
+
+  .sidemenu.sidemenu--open {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  }
 }
 </style>

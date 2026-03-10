@@ -23,7 +23,10 @@ function compactToMeshData(c: CompactMesh): MeshData {
 
 export function useUrlData() {
   onMounted(async () => {
-    const params = new URLSearchParams(window.location.search)
+    // Hash router: params are after #/?data=... not in window.location.search
+    const hash = window.location.hash
+    const qIdx = hash.indexOf('?')
+    const params = qIdx >= 0 ? new URLSearchParams(hash.slice(qIdx)) : new URLSearchParams()
     const data = params.get('data')
     if (!data) return
 
@@ -57,9 +60,9 @@ export function useUrlData() {
         }
       }
 
-      // Clean URL
-      const cleanUrl = window.location.pathname + window.location.hash
-      window.history.replaceState(null, '', cleanUrl)
+      // Clean URL — remove data param from hash, keep route
+      const hashPath = hash.split('?')[0] || '#/'
+      window.history.replaceState(null, '', window.location.pathname + hashPath)
     } catch (e) {
       console.error('Failed to decode URL data:', e)
     }
