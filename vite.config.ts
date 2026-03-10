@@ -4,7 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
-  base: process.env.VITE_BASE_PATH || '/',
+  base: process.env.CI ? '/Flashforge-Calibration-Assistant-web/' : '/',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
