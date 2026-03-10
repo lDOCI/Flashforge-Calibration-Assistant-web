@@ -22,6 +22,10 @@ function downloadCli() {
   window.open('https://github.com/lDOCI/Flashforge-Calibration-Assistant-web/tree/main/cli', '_blank')
 }
 
+function downloadWinSCP() {
+  window.open('https://winscp.net/eng/download.php', '_blank')
+}
+
 // Manual file handling with drag-and-drop on the whole view
 function handleDrop(e: DragEvent) {
   e.preventDefault()
@@ -111,9 +115,14 @@ function processFile(file: File) {
       </div>
       <p class="hint">{{ t('neo_ui.data.ssh_hint') }}</p>
 
-      <button class="btn-download" @click="downloadCli">
-        {{ t('neo_ui.data.download_cli') }}
-      </button>
+      <div class="ssh-buttons">
+        <button class="btn-download" @click="downloadCli">
+          {{ t('neo_ui.data.download_cli') }}
+        </button>
+        <button class="btn-download btn-winscp" @click="downloadWinSCP">
+          {{ t('neo_ui.data.download_winscp') }}
+        </button>
+      </div>
     </div>
 
     <!-- Log -->
@@ -245,6 +254,23 @@ h3 {
 }
 
 .btn-download:hover {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.ssh-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-winscp {
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
+.btn-winscp:hover {
+  border-color: var(--accent-primary);
   background: var(--accent-primary);
   color: #fff;
 }

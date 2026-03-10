@@ -469,7 +469,8 @@
       "flash_step_6": "Нажмите кнопку ниже, чтобы загрузить файл printer.cfg.",
       "ssh_title": "Через SSH",
       "ssh_hint": "Используйте CLI-утилиту для автоматического скачивания printer.cfg и данных шейпера по SSH.",
-      "download_cli": "Скачать SSH-утилиту"
+      "download_cli": "Скачать SSH-утилиту",
+      "download_winscp": "Скачать WinSCP"
     },
     "bed": {
       "header": "Рабочая область выравнивания стола",

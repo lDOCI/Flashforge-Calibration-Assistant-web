@@ -468,7 +468,8 @@
       "flash_step_6": "Click the button below to load the printer.cfg file.",
       "ssh_title": "Via SSH",
       "ssh_hint": "Use the CLI utility to automatically download printer.cfg and shaper data via SSH.",
-      "download_cli": "Download SSH utility"
+      "download_cli": "Download SSH utility",
+      "download_winscp": "Download WinSCP"
     },
     "bed": {
       "header": "Bed Leveling Workspace",
