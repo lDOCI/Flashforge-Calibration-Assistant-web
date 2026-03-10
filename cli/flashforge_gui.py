@@ -53,13 +53,17 @@ OUTPUT_DIR = Path.home() / "Flashforge Calibration"
 
 LANG_RU = {
     "title": "Помощник Калибровки Flashforge",
+    "description": (
+        "Программа скачает файлы с принтера, откроет папку\n"
+        "с данными и сайт в браузере. Перетащите файлы на сайт."
+    ),
     "ip": "IP адрес принтера:",
     "password": "Пароль:",
     "show": "Показать",
     "remember": "Запомнить пароль",
     "shapers": "Скачать CSV шейперов (Input Shaper)",
     "btn_go": "Скачать и открыть",
-    "btn_ready": "Готово. Введите IP принтера и нажмите «Скачать и открыть».",
+    "btn_ready": "Введите IP принтера и нажмите «Скачать и открыть».",
     "missing_paramiko": "paramiko не установлен.\n\nВыполните: pip install paramiko",
     "missing_ip": "Введите IP адрес принтера.",
     "connecting": "Подключение к root@{host} ...",
@@ -71,21 +75,26 @@ LANG_RU = {
     "no_shapers": "  CSV шейперов не найдено.",
     "shaper_found": "  {name}: {size} байт",
     "saved_to": "Файлы сохранены в: {path}",
-    "opening": "Открываю папку и браузер...",
-    "done": "Готово! Перетащите файлы из папки на сайт.",
+    "opening_folder": "Открываю папку с файлами...",
+    "opening_browser": "Открываю сайт калибровки в браузере...",
+    "done": "Готово! Перетащите скачанные файлы из папки на сайт.",
     "cfg_not_found": "printer.cfg не найден ни по одному пути:\n{paths}",
     "error": "Ошибка подключения",
 }
 
 LANG_EN = {
     "title": "Flashforge Calibration Assistant",
+    "description": (
+        "Downloads files from the printer, opens the folder\n"
+        "and the website. Drag the files onto the site."
+    ),
     "ip": "Printer IP Address:",
     "password": "Password:",
     "show": "Show",
     "remember": "Remember password",
     "shapers": "Download shaper CSVs (Input Shaper)",
     "btn_go": "Download & Open",
-    "btn_ready": "Ready. Enter your printer IP and click 'Download & Open'.",
+    "btn_ready": "Enter your printer IP and click 'Download & Open'.",
     "missing_paramiko": "paramiko is not installed.\n\nRun: pip install paramiko",
     "missing_ip": "Please enter the printer IP address.",
     "connecting": "Connecting to root@{host} ...",
@@ -97,24 +106,15 @@ LANG_EN = {
     "no_shapers": "  No shaper CSVs found.",
     "shaper_found": "  {name}: {size} bytes",
     "saved_to": "Files saved to: {path}",
-    "opening": "Opening folder and browser...",
-    "done": "Done! Drag files from the folder onto the website.",
+    "opening_folder": "Opening folder with downloaded files...",
+    "opening_browser": "Opening calibration website in browser...",
+    "done": "Done! Drag the downloaded files from the folder onto the site.",
     "cfg_not_found": "printer.cfg not found at any known path:\n{paths}",
     "error": "Connection Error",
 }
 
 
-def detect_lang() -> dict:
-    """Auto-detect language: Russian if system locale starts with 'ru'."""
-    import locale
-    try:
-        lang = locale.getdefaultlocale()[0] or ""
-    except Exception:
-        lang = ""
-    return LANG_RU if lang.lower().startswith("ru") else LANG_EN
-
-
-L = detect_lang()
+L = LANG_RU  # default Russian
 
 
 # ─── Settings ─────────────────────────────────────────────────────────────────
@@ -208,48 +208,67 @@ class App(tk.Tk):
         main = ttk.Frame(self, padding=16)
         main.pack(fill="both", expand=True)
 
-        ttk.Label(main, text=L["title"],
-                  style="Header.TLabel").grid(row=0, column=0, columnspan=2, pady=(0, 12))
+        # Header row with title + lang switch
+        header_frame = ttk.Frame(main)
+        header_frame.grid(row=0, column=0, columnspan=2, pady=(0, 4), sticky="ew")
+        header_frame.columnconfigure(0, weight=1)
+
+        ttk.Label(header_frame, text=L["title"],
+                  style="Header.TLabel").grid(row=0, column=0)
+
+        style.configure("Lang.TButton", font=("Segoe UI", 9), padding=(4, 2))
+        self.lang_btn = ttk.Button(header_frame, text="EN", style="Lang.TButton",
+                                   command=self._toggle_lang, width=3)
+        self.lang_btn.grid(row=0, column=1, sticky="e")
+
+        # Description
+        style.configure("Desc.TLabel", background=bg, foreground="#a6adc8",
+                        font=("Segoe UI", 9))
+        self.desc_label = ttk.Label(main, text=L["description"], style="Desc.TLabel")
+        self.desc_label.grid(row=1, column=0, columnspan=2, pady=(0, 10))
 
         # IP
-        ttk.Label(main, text=L["ip"]).grid(row=1, column=0, sticky="w", **pad)
+        self.ip_label = ttk.Label(main, text=L["ip"])
+        self.ip_label.grid(row=2, column=0, sticky="w", **pad)
         self.host_var = tk.StringVar()
         ttk.Entry(main, textvariable=self.host_var, width=35).grid(
-            row=1, column=1, sticky="ew", **pad)
+            row=2, column=1, sticky="ew", **pad)
 
         # Password
-        ttk.Label(main, text=L["password"]).grid(row=2, column=0, sticky="w", **pad)
+        self.pass_label = ttk.Label(main, text=L["password"])
+        self.pass_label.grid(row=3, column=0, sticky="w", **pad)
         self.pass_var = tk.StringVar()
         pass_frame = ttk.Frame(main)
-        pass_frame.grid(row=2, column=1, sticky="ew", **pad)
+        pass_frame.grid(row=3, column=1, sticky="ew", **pad)
         self.pass_entry = ttk.Entry(pass_frame, textvariable=self.pass_var, show="*", width=28)
         self.pass_entry.pack(side="left", fill="x", expand=True)
         self.show_pass = tk.BooleanVar(value=False)
-        ttk.Checkbutton(pass_frame, text=L["show"], variable=self.show_pass,
-                        command=self._toggle_pass).pack(side="left", padx=(4, 0))
+        self.show_btn = ttk.Checkbutton(pass_frame, text=L["show"], variable=self.show_pass,
+                                        command=self._toggle_pass)
+        self.show_btn.pack(side="left", padx=(4, 0))
 
         # Remember
         self.remember_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(main, text=L["remember"],
-                        variable=self.remember_var).grid(
-            row=3, column=1, sticky="w", padx=12, pady=(2, 4))
+        self.remember_btn = ttk.Checkbutton(main, text=L["remember"],
+                                            variable=self.remember_var)
+        self.remember_btn.grid(row=4, column=1, sticky="w", padx=12, pady=(2, 4))
 
         # Shapers
         self.shapers_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(main, text=L["shapers"],
-                        variable=self.shapers_var).grid(
-            row=4, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 4))
+        self.shapers_btn = ttk.Checkbutton(main, text=L["shapers"],
+                                           variable=self.shapers_var)
+        self.shapers_btn.grid(row=5, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 4))
 
         # Button
         self.btn_go = ttk.Button(main, text=L["btn_go"],
                                  style="Accent.TButton", command=self._on_go)
-        self.btn_go.grid(row=5, column=0, columnspan=2, pady=(12, 4))
+        self.btn_go.grid(row=6, column=0, columnspan=2, pady=(12, 4))
 
         # Log
         self.log_text = tk.Text(main, height=8, width=52, bg="#181825", fg="#a6adc8",
                                 font=("Consolas", 9), relief="flat", state="disabled",
                                 wrap="word")
-        self.log_text.grid(row=6, column=0, columnspan=2, pady=(8, 0), sticky="ew")
+        self.log_text.grid(row=7, column=0, columnspan=2, pady=(8, 0), sticky="ew")
         self._log(L["btn_ready"])
 
     def _center_window(self):
@@ -258,6 +277,23 @@ class App(tk.Tk):
         x = (self.winfo_screenwidth() - w) // 2
         y = (self.winfo_screenheight() - h) // 2
         self.geometry(f"+{x}+{y}")
+
+    def _toggle_lang(self):
+        global L
+        if L is LANG_RU:
+            L = LANG_EN
+            self.lang_btn.configure(text="RU")
+        else:
+            L = LANG_RU
+            self.lang_btn.configure(text="EN")
+        self.title(L["title"])
+        self.desc_label.configure(text=L["description"])
+        self.ip_label.configure(text=L["ip"])
+        self.pass_label.configure(text=L["password"])
+        self.show_btn.configure(text=L["show"])
+        self.remember_btn.configure(text=L["remember"])
+        self.shapers_btn.configure(text=L["shapers"])
+        self.btn_go.configure(text=L["btn_go"])
 
     def _toggle_pass(self):
         self.pass_entry.configure(show="" if self.show_pass.get() else "*")
@@ -351,12 +387,14 @@ class App(tk.Tk):
 
                 out = str(OUTPUT_DIR)
                 self.after(0, lambda o=out: self._log(L["saved_to"].format(path=o)))
-                self.after(0, lambda: self._log(L["opening"]))
 
-                # Open folder and browser
+                # Open folder
+                self.after(0, lambda: self._log(L["opening_folder"]))
                 open_folder(OUTPUT_DIR)
-                web_url = WEB_APP_URL if L is LANG_EN else WEB_APP_URL
-                webbrowser.open(web_url)
+
+                # Open browser
+                self.after(0, lambda: self._log(L["opening_browser"]))
+                webbrowser.open(WEB_APP_URL)
 
                 self.after(0, lambda: self._log(L["done"]))
 

@@ -468,6 +468,7 @@
       "flash_step_6": "Click the button below to load the printer.cfg file.",
       "ssh_title": "Via SSH",
       "ssh_hint": "Use the CLI utility to automatically download printer.cfg and shaper data via SSH.",
+      "ssh_paths": "File paths on the printer (connect as root via SSH/WinSCP):\n• printer.cfg: /opt/config/printer.cfg or /root/printer_data/config/printer.cfg or /usr/data/config/printer.cfg\n• Shaper CSVs: /tmp/calibration_data_*.csv",
       "download_cli": "Download SSH utility",
       "download_winscp": "Download WinSCP"
     },
