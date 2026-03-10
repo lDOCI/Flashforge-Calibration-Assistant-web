@@ -2,8 +2,9 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n()
+const { t, tm } = useI18n()
 const emit = defineEmits<{ navigate: [] }>()
+const baseUrl = import.meta.env.BASE_URL
 
 const navItems = [
   { to: '/', label: 'neo_ui.nav.bed' },
@@ -16,24 +17,14 @@ const navItems = [
 const eggClicks = ref(0)
 const eggActive = ref(false)
 const eggMsg = ref('')
-const layerCount = ref(5)
 let eggTimer = 0
-
-const eggMessages = [
-  'Perfect first layer!',
-  'Bed is level. Trust me.',
-  'Your belts are perfectly tensioned... probably.',
-  'Печатай, не бойся.',
-  '0.00mm deviation. We did it.',
-  'The nozzle whisperer has arrived.',
-]
 
 function onAuthorClick() {
   clearTimeout(eggTimer)
   eggClicks.value++
   if (eggClicks.value >= 20) {
-    eggMsg.value = eggMessages[Math.floor(Math.random() * eggMessages.length)]
-    layerCount.value = 3 + Math.floor(Math.random() * 5)
+    const msgs = tm('neo_ui.footer.egg') as string[]
+    eggMsg.value = Array.isArray(msgs) ? msgs[Math.floor(Math.random() * msgs.length)] : String(msgs)
     eggActive.value = true
     eggClicks.value = 0
     setTimeout(() => { eggActive.value = false }, 8000)
@@ -61,17 +52,7 @@ function onAuthorClick() {
       <span class="footer-author">{{ t('neo_ui.footer.author') }} <span class="author-name" @click="onAuthorClick">I_DOC_I</span></span>
       <Transition name="egg-fade">
         <div v-if="eggActive" class="egg">
-          <div class="egg-scene">
-            <div class="egg-frame">
-              <div class="egg-gantry">
-                <div class="egg-head"></div>
-              </div>
-              <div class="egg-layers">
-                <div v-for="i in layerCount" :key="i" class="egg-layer" :style="{ animationDelay: `${i * 0.3}s` }"></div>
-              </div>
-              <div class="egg-bed-plate"></div>
-            </div>
-          </div>
+          <img :src="`${baseUrl}p.gif`" class="egg-img" alt="" />
           <div class="egg-msg">{{ eggMsg }}</div>
         </div>
       </Transition>
@@ -151,7 +132,7 @@ function onAuthorClick() {
   cursor: default;
 }
 
-/* Easter egg — mini printer animation */
+/* Easter egg */
 .egg {
   margin-top: 10px;
   padding: 10px 8px 8px;
@@ -162,92 +143,11 @@ function onAuthorClick() {
   overflow: hidden;
 }
 
-.egg-scene {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-
-.egg-frame {
+.egg-img {
   width: 100px;
-  height: 70px;
-  position: relative;
-  border: 2px solid var(--text-muted);
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-}
-
-.egg-frame::before,
-.egg-frame::after {
-  content: '';
-  position: absolute;
-  top: -30px;
-  width: 2px;
-  height: 30px;
-  background: var(--text-muted);
-}
-
-.egg-frame::before { left: 0; }
-.egg-frame::after { right: 0; }
-
-.egg-gantry {
-  position: absolute;
-  top: -8px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--text-muted);
-}
-
-.egg-head {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--accent-primary);
-  border-radius: 2px;
-  top: -4px;
-  animation: egg-move-head 2s ease-in-out infinite;
-}
-
-@keyframes egg-move-head {
-  0%, 100% { left: 8px; }
-  25% { left: 78px; }
-  50% { left: 78px; }
-  75% { left: 8px; }
-}
-
-.egg-layers {
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 1px;
-}
-
-.egg-layer {
-  width: 50px;
-  height: 3px;
-  background: var(--accent-primary);
-  border-radius: 1px;
-  opacity: 0;
-  animation: egg-layer-appear 0.4s forwards;
-}
-
-@keyframes egg-layer-appear {
-  from { opacity: 0; width: 0; }
-  to { opacity: 0.7; width: 50px; }
-}
-
-.egg-bed-plate {
-  position: absolute;
-  bottom: 0;
-  left: 4px;
-  right: 4px;
-  height: 3px;
-  background: var(--text-muted);
-  border-radius: 1px;
+  height: 100px;
+  object-fit: contain;
+  margin-bottom: 6px;
 }
 
 .egg-msg {

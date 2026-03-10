@@ -390,7 +390,15 @@
       "data": "Data Import"
     },
     "footer": {
-      "author": "by"
+      "author": "by",
+      "egg": [
+        "Perfect first layer!",
+        "Bed is level. Trust me.",
+        "Your belts are perfectly tensioned... probably.",
+        "Print it, don't be afraid.",
+        "0.00mm deviation. We did it.",
+        "The nozzle whisperer has arrived."
+      ]
     },
     "top_bar": {
       "title": "Flashforge Calibration Assistant",
