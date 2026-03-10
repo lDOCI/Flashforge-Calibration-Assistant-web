@@ -27,8 +27,12 @@ export function useUrlData() {
 
   onMounted(async () => {
     await router.isReady()
+    // Check window.location.search first (Telegram and other apps strip #hash)
+    // then fall back to hash-based query (legacy share links)
     const route = router.currentRoute.value
-    const data = (route.query.data as string) || null
+    const data = new URLSearchParams(window.location.search).get('data')
+      || (route.query.data as string)
+      || null
     if (!data) return
 
     try {
@@ -61,8 +65,9 @@ export function useUrlData() {
         }
       }
 
-      // Clean URL — remove data param, keep route
-      router.replace({ path: route.path })
+      // Clean URL — remove ?data= from search and hash
+      const cleanUrl = window.location.origin + window.location.pathname + (window.location.hash || '#/')
+      window.history.replaceState(null, '', cleanUrl)
     } catch (e) {
       console.error('Failed to decode URL data:', e)
     }

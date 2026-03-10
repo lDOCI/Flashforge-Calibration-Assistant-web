@@ -49,8 +49,9 @@ export async function buildShareUrl(): Promise<string> {
   }
 
   const encoded = await encodePayload(payload)
-  const base = window.location.origin + window.location.pathname + window.location.hash.split('?')[0]
-  return `${base}?data=${encoded}`
+  // Put ?data= BEFORE the hash so Telegram and other apps don't strip it
+  const base = window.location.origin + window.location.pathname
+  return `${base}?data=${encoded}#/`
 }
 
 export async function copyShareUrl(): Promise<void> {
