@@ -25,8 +25,9 @@ from pathlib import Path
 
 try:
     import paramiko
-except ImportError:
+except Exception as _imp_err:
     paramiko = None
+    _paramiko_error = str(_imp_err)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -322,7 +323,8 @@ class App(tk.Tk):
 
     def _on_go(self):
         if paramiko is None:
-            messagebox.showerror(L["error"], L["missing_paramiko"])
+            messagebox.showerror(L["error"],
+                                 f"{L['missing_paramiko']}\n\n{_paramiko_error}")
             return
 
         host = self.host_var.get().strip()
