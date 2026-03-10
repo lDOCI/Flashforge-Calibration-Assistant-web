@@ -1,0 +1,94 @@
+:root {
+  /* Dark theme (default) — industrial/engineering feel */
+  --bg-primary: #111318;
+  --bg-surface: #181B22;
+  --bg-elevated: #1E2128;
+  --bg-hover: #252930;
+
+  --text-primary: #E8EAED;
+  --text-secondary: #9AA0B0;
+  --text-muted: #5C6170;
+
+  --accent-primary: #4A9EF5;
+  --accent-primary-hover: #3A8DE0;
+  --accent-success: #3DB87C;
+  --accent-warning: #E8A33D;
+  --accent-error: #D94848;
+
+  --border-color: #2A2E38;
+  --border-subtle: #1E2128;
+
+  --card-bg: #181B22;
+  --card-border: #2A2E38;
+  --card-shadow: none;
+
+  --sidebar-width: 200px;
+  --topbar-height: 44px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+
+  /* Status colors */
+  --status-good: #3DB87C;
+  --status-ok: #4A9EF5;
+  --status-warn: #E8A33D;
+  --status-bad: #D94848;
+
+  /* Tape diagram */
+  --tape-1: #3DB87C;
+  --tape-2: #E8A33D;
+  --tape-3: #D94848;
+
+  /* Plotly chart colors */
+  --plot-bg: #181B22;
+  --plot-paper: #111318;
+  --plot-grid: #2A2E38;
+  --plot-text: #9AA0B0;
+  --plot-font: #E8EAED;
+
+  /* Monospace stack */
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+:root.light {
+  --bg-primary: #F2F3F5;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-hover: #E8EAEF;
+
+  --text-primary: #1A1D26;
+  --text-secondary: #5C6170;
+  --text-muted: #9AA0B0;
+
+  --accent-primary: #2D7DD2;
+  --accent-primary-hover: #2468B0;
+  --accent-success: #2A9D68;
+  --accent-warning: #C88A2E;
+  --accent-error: #C03838;
+
+  --border-color: #D5D8E0;
+  --border-subtle: #E8EAEF;
+
+  --card-bg: #FFFFFF;
+  --card-border: #D5D8E0;
+  --card-shadow: none;
+
+  --status-good: #2A9D68;
+  --status-ok: #2D7DD2;
+  --status-warn: #C88A2E;
+  --status-bad: #C03838;
+
+  --tape-1: #2A9D68;
+  --tape-2: #C88A2E;
+  --tape-3: #C03838;
+
+  --plot-bg: #FFFFFF;
+  --plot-paper: #F2F3F5;
+  --plot-grid: #D5D8E0;
+  --plot-text: #5C6170;
+  --plot-font: #1A1D26;
+}

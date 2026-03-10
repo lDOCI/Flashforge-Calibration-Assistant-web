@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.spec
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Compiled JS duplicates of TS/Vue sources
+src/**/*.js
+src/**/*.vue.js
+
+# Env
+.env
+.env.*
