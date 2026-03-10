@@ -19,7 +19,7 @@ function appendLog(msg: string) {
 }
 
 function downloadCli() {
-  window.open('https://github.com/lDOCI/Flashforge-Calibration-Assistant-web/tree/main/cli', '_blank')
+  window.open('https://github.com/lDOCI/Flashforge-Calibration-Assistant-web/releases/tag/v1.1.0', '_blank')
 }
 
 function downloadWinSCP() {
