@@ -123,6 +123,8 @@ function processFile(file: File) {
           {{ t('neo_ui.data.download_winscp') }}
         </button>
       </div>
+
+      <pre class="ssh-paths">{{ t('neo_ui.data.ssh_paths') }}</pre>
     </div>
 
     <!-- Log -->
@@ -273,6 +275,20 @@ h3 {
   border-color: var(--accent-primary);
   background: var(--accent-primary);
   color: #fff;
+}
+
+.ssh-paths {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
 }
 
 .upload-buttons {

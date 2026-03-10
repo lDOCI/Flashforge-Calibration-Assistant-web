@@ -469,6 +469,7 @@
       "flash_step_6": "Нажмите кнопку ниже, чтобы загрузить файл printer.cfg.",
       "ssh_title": "Через SSH",
       "ssh_hint": "Используйте CLI-утилиту для автоматического скачивания printer.cfg и данных шейпера по SSH.",
+      "ssh_paths": "Пути к файлам на принтере (подключение root по SSH/WinSCP):\n• printer.cfg: /opt/config/printer.cfg или /root/printer_data/config/printer.cfg или /usr/data/config/printer.cfg\n• CSV шейперов: /tmp/calibration_data_*.csv",
       "download_cli": "Скачать SSH-утилиту",
       "download_winscp": "Скачать WinSCP"
     },
