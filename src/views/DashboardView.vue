@@ -10,7 +10,7 @@ import FileDropZone from '@/components/common/FileDropZone.vue'
 const { t } = useI18n()
 const bedStore = useBedStore()
 const shaperStore = useShaperStore()
-const { triggerFileInput, handleDrop, handleDragOver } = useFileLoader()
+const { handleDrop, handleDragOver } = useFileLoader()
 
 const bedStats = computed(() => {
   const ws = bedStore.activeWorkspace
@@ -73,7 +73,6 @@ const shaperLabel = computed(() => {
       <FileDropZone
         :label="t('neo_ui.bed.status.load_hint')"
         accept=".cfg,.conf,.csv"
-        @click="triggerFileInput()"
       />
     </div>
 

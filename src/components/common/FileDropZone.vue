@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFileLoader } from '@/composables/useFileLoader'
 
-defineProps<{ label?: string }>()
+const props = defineProps<{ label?: string; accept?: string }>()
 
 const { t } = useI18n()
 const { handleDrop, handleDragOver, triggerFileInput } = useFileLoader()
@@ -26,7 +26,7 @@ function onDrop(e: DragEvent) {
     @dragover="handleDragOver"
     @dragenter="onDragEnter"
     @dragleave="onDragLeave"
-    @click="triggerFileInput()"
+    @click="triggerFileInput(props.accept)"
   >
     <span class="dropzone-label">{{ label || t('neo_ui.common.drop_hint') }}</span>
   </div>

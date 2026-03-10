@@ -19,7 +19,7 @@ import type { StageResult } from '@/lib/calibration/types'
 const { t } = useI18n()
 const bedStore = useBedStore()
 const settingsStore = useSettingsStore()
-const { triggerFileInput, handleDrop, handleDragOver } = useFileLoader()
+const { handleDrop, handleDragOver } = useFileLoader()
 
 const selectedStage = ref<StageResult | null>(null)
 const ws = computed(() => bedStore.activeWorkspace)
@@ -103,7 +103,6 @@ async function onShare() {
       <FileDropZone
         :label="t('neo_ui.bed.status.load_hint')"
         accept=".cfg,.conf"
-        @click="triggerFileInput('.cfg,.conf')"
       />
     </template>
 

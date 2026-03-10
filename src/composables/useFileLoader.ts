@@ -34,12 +34,17 @@ export function useFileLoader() {
     reader.readAsText(file)
   }
 
+  let dialogOpen = false
+
   function triggerFileInput(accept: string = '.cfg,.conf,.csv') {
+    if (dialogOpen) return
+    dialogOpen = true
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = accept
     input.multiple = true
     input.onchange = () => {
+      dialogOpen = false
       if (input.files) {
         for (const file of input.files) {
           handleFile(file)
@@ -47,6 +52,8 @@ export function useFileLoader() {
       }
     }
     input.click()
+    // Reset flag if user cancels the dialog
+    setTimeout(() => { dialogOpen = false }, 60000)
   }
 
   function handleDrop(event: DragEvent) {
