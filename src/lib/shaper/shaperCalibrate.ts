@@ -3,6 +3,7 @@
  * Ported from Klipper's shaper_calibrate.py
  *
  * Copyright (C) 2020  Dmitry Butyugin <dmbutyugin@google.com>
+ * Ported to TypeScript 2025 by lDOCI.
  * This file may be distributed under the terms of the GNU GPLv3 license.
  */
 import type {
