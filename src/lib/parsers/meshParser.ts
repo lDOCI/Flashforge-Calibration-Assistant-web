@@ -1,123 +1,88 @@
 import type { MeshData } from '../calibration/types'
 
-const POINT_PATTERN = /#\*#\s+((?:-?\d+\.\d+,\s*)*-?\d+\.\d+)/
-const PARAM_PATTERN = /#\*#\s+(\w+)\s+=\s+(.+)/
-const SECTION_PATTERN = /#\*#\s+\[bed_mesh\s+(.*?)\]/
+const NUM = String.raw`-?\d+(?:\.\d+)?`
+const POINT_PATTERN = new RegExp(String.raw`^#\*#\s+(${NUM}(?:\s*,\s*${NUM})*)\s*$`)
+const PARAM_PATTERN = /^#\*#\s+(\w+)\s*=\s*(.*)$/
+const SECTION_PATTERN = /^#\*#\s+\[([^\]]+)\]/
+const BED_MESH_PATTERN = /^bed_mesh\s+(.+)$/
 
 export interface ParsedMesh {
   name: string
   meshData: MeshData
 }
 
+/** Parses the SAVE_CONFIG `[bed_mesh NAME]` blocks Klipper appends to printer.cfg. */
 export class KlipperMeshParser {
-  /**
-   * Parse all bed_mesh sections from a printer.cfg file.
-   * Returns an array of named meshes.
-   */
   parseAllMeshes(content: string): ParsedMesh[] {
-    const lines = content.split('\n')
-    const sections: { name: string; startIdx: number }[] = []
+    const lines = content.split(/\r?\n/).map(l => l.trim())
+    const sections: { name: string; start: number; end: number }[] = []
 
-    // Find all [bed_mesh NAME] section headers
+    // Each [bed_mesh NAME] block runs until the next #*# [section] header.
+    let current: { name: string; start: number } | null = null
     for (let i = 0; i < lines.length; i++) {
-      const match = SECTION_PATTERN.exec(lines[i])
-      if (match) {
-        sections.push({ name: match[1].trim(), startIdx: i })
-      }
+      const section = SECTION_PATTERN.exec(lines[i])
+      if (!section) continue
+      if (current) sections.push({ ...current, end: i })
+      const mesh = BED_MESH_PATTERN.exec(section[1].trim())
+      current = mesh ? { name: mesh[1].trim(), start: i + 1 } : null
     }
+    if (current) sections.push({ ...current, end: lines.length })
 
-    if (sections.length === 0) {
-      // Fallback: try parsing the whole file as a single mesh
-      const mesh = this.parseMeshBlock(lines, 0, lines.length)
-      if (mesh) return [{ name: 'default', meshData: mesh }]
-      return []
-    }
+    // No section headers at all: maybe a bare block was pasted.
+    if (sections.length === 0) sections.push({ name: 'default', start: 0, end: lines.length })
 
     const results: ParsedMesh[] = []
-    for (let s = 0; s < sections.length; s++) {
-      const start = sections[s].startIdx
-      // End at next section or end of file — but we need to find
-      // the next #*# section header (any type, not just bed_mesh)
-      const end = s + 1 < sections.length
-        ? sections[s + 1].startIdx
-        : this.findNextNonBedSection(lines, start + 1, lines.length)
-
-      const mesh = this.parseMeshBlock(lines, start, end)
-      if (mesh) {
-        results.push({ name: sections[s].name, meshData: mesh })
-      }
+    for (const s of sections) {
+      const mesh = this.parseMeshBlock(lines.slice(s.start, s.end))
+      if (mesh) results.push({ name: s.name, meshData: mesh })
     }
-
     return results
   }
 
-  /** Find where the next #*# [something_else] section starts, or return endIdx */
-  private findNextNonBedSection(lines: string[], startIdx: number, endIdx: number): number {
-    for (let i = startIdx; i < endIdx; i++) {
-      const line = lines[i]
-      if (/#\*#\s+\[(?!bed_mesh)/.test(line)) {
-        return i
-      }
-    }
-    return endIdx
-  }
-
-  /** Parse a single mesh block from a range of lines */
-  private parseMeshBlock(lines: string[], startIdx: number, endIdx: number): MeshData | null {
-    const pointsData: number[][] = []
+  private parseMeshBlock(lines: string[]): MeshData | null {
+    const rows: number[][] = []
     const params: Record<string, string> = {}
 
-    for (let i = startIdx; i < endIdx; i++) {
-      const line = lines[i]
-
-      const pointMatch = POINT_PATTERN.exec(line)
-      if (pointMatch) {
-        const points = pointMatch[1].split(',').map(p => parseFloat(p.trim()))
-        pointsData.push(points)
+    for (const line of lines) {
+      const point = POINT_PATTERN.exec(line)
+      if (point) {
+        rows.push(point[1].split(',').map(p => parseFloat(p)))
         continue
       }
-
-      const paramMatch = PARAM_PATTERN.exec(line)
-      if (paramMatch && !SECTION_PATTERN.test(line)) {
-        params[paramMatch[1]] = paramMatch[2].trim()
-      }
+      const param = PARAM_PATTERN.exec(line)
+      if (param) params[param[1]] = param[2].trim()
     }
 
     const required = ['x_count', 'y_count', 'min_x', 'max_x', 'min_y', 'max_y']
-    if (!required.every(p => p in params)) return null
-    if (pointsData.length === 0) return null
-
-    const xCount = parseInt(params['x_count'])
-    const yCount = parseInt(params['y_count'])
+    if (rows.length === 0 || !required.every(p => p in params)) return null
 
     return {
-      matrix: pointsData,
-      xCount,
-      yCount,
-      minX: parseFloat(params['min_x']),
-      maxX: parseFloat(params['max_x']),
-      minY: parseFloat(params['min_y']),
-      maxY: parseFloat(params['max_y']),
+      matrix: rows,
+      xCount: parseInt(params.x_count, 10),
+      yCount: parseInt(params.y_count, 10),
+      minX: parseFloat(params.min_x),
+      maxX: parseFloat(params.max_x),
+      minY: parseFloat(params.min_y),
+      maxY: parseFloat(params.max_y),
     }
   }
 
-  /** Legacy single-mesh parse — returns the first mesh found */
   parseConfigFile(content: string): MeshData | null {
-    const meshes = this.parseAllMeshes(content)
-    return meshes.length > 0 ? meshes[0].meshData : null
+    return this.parseAllMeshes(content)[0]?.meshData ?? null
   }
+}
 
-  validateMeshData(meshData: MeshData): boolean {
-    if (meshData.matrix.length !== meshData.yCount) return false
-    if (meshData.matrix[0]?.length !== meshData.xCount) return false
-
-    for (const row of meshData.matrix) {
-      for (const val of row) {
-        if (Math.abs(val) > 10) return false
-        if (!isFinite(val)) return false
-      }
-    }
-
-    return true
-  }
+/** Shape and value sanity checks; also used for meshes that arrive via share links. */
+export function validateMeshData(m: MeshData): boolean {
+  if (!Number.isInteger(m.xCount) || !Number.isInteger(m.yCount)) return false
+  if (m.xCount < 2 || m.yCount < 2) return false
+  if (![m.minX, m.maxX, m.minY, m.maxY].every(Number.isFinite)) return false
+  if (m.maxX <= m.minX || m.maxY <= m.minY) return false
+  if (!Array.isArray(m.matrix) || m.matrix.length !== m.yCount) return false
+  return m.matrix.every(
+    row =>
+      Array.isArray(row) &&
+      row.length === m.xCount &&
+      row.every(v => Number.isFinite(v) && Math.abs(v) <= 10),
+  )
 }

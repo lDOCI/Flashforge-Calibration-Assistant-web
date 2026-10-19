@@ -18,11 +18,15 @@ const grid = computed(() => {
   )
 
   for (const action of props.actions) {
-    // Parse position like "2B" → row=1, col=1
-    const match = action.identifier.match(/^(\d+)([A-Z])$/)
-    if (!match) continue
-    const row = parseInt(match[1]) - 1
-    const col = match[2].charCodeAt(0) - 65
+    let row = action.metadata?.row as number | undefined
+    let col = action.metadata?.col as number | undefined
+    if (row === undefined || col === undefined) {
+      // Older actions only carry a label like "2B" → row=1, col=1
+      const match = action.identifier.match(/^(\d+)([A-Z])$/)
+      if (!match) continue
+      row = parseInt(match[1]) - 1
+      col = match[2].charCodeAt(0) - 65
+    }
     if (row >= 0 && row < props.rows && col >= 0 && col < props.cols) {
       g[row][col] = (action.metadata?.layers as number) ?? 1
     }

@@ -461,3 +461,64 @@ export function findBestShaper(
 
   return [bestShaper!, allShapers]
 }
+
+// ---------- spectrogram ----------
+
+export interface Spectrogram {
+  /** Frequency of each column, Hz. */
+  freqs: number[]
+  /** Position of each row in the test, 0–100 %. */
+  times: number[]
+  /** Vibration power (X + Y + Z), rows = time, cols = frequency. */
+  power: number[][]
+}
+
+/**
+ * Short-time PSD of raw accelerometer data: the same windows Welch's method
+ * averages, kept separate so you can see how vibration changes during the test.
+ */
+export function calcSpectrogram(rawData: Float64Array[], maxFreq = MAX_FREQ, maxRows = 160): Spectrogram | null {
+  const N = rawData.length
+  if (N === 0) return null
+  const T = rawData[N - 1][0] - rawData[0][0]
+  if (T <= 0) return null
+  const fs = N / T
+
+  let M = 1
+  while (M < fs * WINDOW_T_SEC) M <<= 1
+  if (N <= M) return null
+
+  const window = kaiserWindow(M, 6.0)
+  let windowSq = 0
+  for (let i = 0; i < M; i++) windowSq += window[i] * window[i]
+
+  const binHz = fs / M
+  const nBins = Math.min(Math.floor(M / 2) + 1, Math.floor(maxFreq / binHz) + 1)
+  // 75 % overlap for a smooth picture, thinned out if the test is long.
+  const step = Math.max(Math.floor(M / 4), Math.ceil((N - M) / maxRows))
+
+  const power: number[][] = []
+  const times: number[] = []
+  const windowed = new Float64Array(M)
+  for (let offset = 0; offset + M <= N; offset += step) {
+    const row = new Array<number>(nBins).fill(0)
+    for (let axis = 1; axis <= 3; axis++) {
+      let mean = 0
+      for (let i = 0; i < M; i++) mean += rawData[offset + i][axis]
+      mean /= M
+      for (let i = 0; i < M; i++) windowed[i] = window[i] * (rawData[offset + i][axis] - mean)
+      const spec = rfft(windowed, M)
+      for (let k = 0; k < nBins; k++) {
+        row[k] += (spec[2 * k] ** 2 + spec[2 * k + 1] ** 2) / (windowSq * fs)
+      }
+    }
+    power.push(row)
+    times.push(((offset + M / 2) / N) * 100)
+  }
+
+  return {
+    freqs: Array.from({ length: nBins }, (_, k) => k * binHz),
+    times,
+    power,
+  }
+}

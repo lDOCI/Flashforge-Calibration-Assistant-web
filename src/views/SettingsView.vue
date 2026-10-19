@@ -45,9 +45,11 @@ function onSettingsChange() {
   bedStore.recomputeAllWorkflows()
 }
 
-function onPresetSettingsChange() {
+function onRecompute() {
   bedStore.recomputeAllWorkflows()
 }
+
+const shaftKeys = ['shaft_front_left', 'shaft_front_right', 'shaft_back'] as const
 
 function resetAll() {
   if (confirm(t('neo_ui.settings.confirm_reset'))) {
@@ -98,8 +100,24 @@ function resetAll() {
           <input type="number" v-model.number="s.hardware.belt_tooth_mm" step="0.1" min="0.1" @change="onSettingsChange" />
         </label>
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.hardware.corner_avg') }}</span>
-          <input type="number" v-model.number="s.hardware.corner_averaging" step="1" min="0" @change="onPresetSettingsChange" />
+          <span class="field-label">{{ t('neo_ui.settings.hardware.max_tape_layers') }}</span>
+          <input type="number" v-model.number="s.hardware.max_tape_layers" step="1" min="1" max="10" @change="onRecompute" />
+        </label>
+        <label class="field">
+          <span class="field-label">{{ t('neo_ui.settings.hardware.tape_patch_mm') }}</span>
+          <input type="number" v-model.number="s.hardware.tape_patch_mm" step="5" min="10" @change="onRecompute" />
+        </label>
+        <label class="field">
+          <span class="field-label">{{ t('neo_ui.settings.hardware.min_adjustment') }}</span>
+          <input type="number" v-model.number="s.hardware.min_adjustment" step="0.01" min="0" @change="onRecompute" />
+        </label>
+        <label class="field">
+          <span class="field-label">{{ t('neo_ui.settings.hardware.max_adjustment') }}</span>
+          <input type="number" v-model.number="s.hardware.max_adjustment" step="0.1" min="0.1" @change="onRecompute" />
+        </label>
+        <label class="field">
+          <span class="field-label">{{ t('neo_ui.settings.hardware.bed_flex') }}</span>
+          <input type="number" v-model.number="s.hardware.bed_flex" step="0.05" min="0" max="1" @change="onRecompute" />
         </label>
         <label class="field">
           <span class="field-label">{{ t('neo_ui.settings.hardware.screw_mode') }}</span>
@@ -149,21 +167,33 @@ function resetAll() {
       </div>
     </section>
 
-    <!-- Environment -->
+    <!-- Geometry -->
     <section class="settings-section">
-      <h2>{{ t('neo_ui.settings.environment.title') }}</h2>
+      <h2>{{ t('neo_ui.settings.geometry.title') }}</h2>
+      <p class="preset-hint">{{ t('neo_ui.settings.geometry.hint') }}</p>
       <div class="field-grid">
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.environment.measurement_temp') }}</span>
-          <input type="number" v-model.number="s.environment.measurement_temp" step="0.5" @change="onSettingsChange" />
+          <span class="field-label">{{ t('neo_ui.settings.geometry.bed_size_x') }}</span>
+          <input type="number" v-model.number="s.geometry.bed_size_x" step="1" min="50" @change="onRecompute" />
         </label>
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.environment.target_temp') }}</span>
-          <input type="number" v-model.number="s.environment.target_temp" step="0.5" @change="onSettingsChange" />
+          <span class="field-label">{{ t('neo_ui.settings.geometry.bed_size_y') }}</span>
+          <input type="number" v-model.number="s.geometry.bed_size_y" step="1" min="50" @change="onRecompute" />
+        </label>
+        <label v-for="key in shaftKeys" :key="key" class="field">
+          <span class="field-label">{{ t(`neo_ui.settings.geometry.${key}`) }}</span>
+          <span class="field-pair">
+            <input type="number" v-model.number="s.geometry[key][0]" step="1" @change="onRecompute" />
+            <input type="number" v-model.number="s.geometry[key][1]" step="1" @change="onRecompute" />
+          </span>
         </label>
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.environment.thermal_coeff') }}</span>
-          <input type="number" v-model.number="s.environment.thermal_expansion_coeff" step="0.0001" @change="onSettingsChange" />
+          <span class="field-label">{{ t('neo_ui.settings.geometry.screw_offset_x') }}</span>
+          <input type="number" v-model.number="s.geometry.screw_offset_x" step="1" min="10" @change="onRecompute" />
+        </label>
+        <label class="field">
+          <span class="field-label">{{ t('neo_ui.settings.geometry.screw_offset_y') }}</span>
+          <input type="number" v-model.number="s.geometry.screw_offset_y" step="1" min="10" @change="onRecompute" />
         </label>
       </div>
     </section>
@@ -194,6 +224,16 @@ function resetAll() {
 </template>
 
 <style scoped>
+.field-pair {
+  display: flex;
+  gap: 6px;
+}
+
+.field-pair input {
+  min-width: 0;
+  flex: 1;
+}
+
 .settings-view {
   max-width: 600px;
 }

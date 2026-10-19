@@ -7,6 +7,12 @@ import { plotlyConfig } from '@/lib/plotlyLocale'
 const props = defineProps<{
   mesh: number[][]
   title?: string
+  /** Fixed colour range, so several meshes can be compared by colour. */
+  range?: [number, number]
+  /** Tighter margins and a slimmer colour bar for side-by-side use. */
+  compact?: boolean
+  /** Fixed chart height in px. */
+  height?: number
 }>()
 
 const { t, locale } = useI18n()
@@ -35,8 +41,10 @@ function render() {
   const fontSize = big > 15 ? 6 : big > 8 ? 7 : big > 5 ? 9 : 10
   const decimals = big > 10 ? 2 : 3
 
-  const annotations: Plotly.Annotations[] = []
-  for (let i = 0; i < rows; i++) {
+  const annotations: Partial<Plotly.Annotations>[] = []
+  // In compact mode dense meshes get no per-cell numbers (hover still shows them).
+  const showValues = !props.compact || big <= 11
+  for (let i = 0; i < (showValues ? rows : 0); i++) {
     for (let j = 0; j < cols; j++) {
       annotations.push({
         x: j, y: i,
@@ -59,24 +67,29 @@ function render() {
     { x: cols - 0.6, y: rows - 0.2, text: br, showarrow: false, font: { size: 11, color: c.text }, xanchor: 'right', yanchor: 'bottom' },
   )
 
-  const data: Plotly.Data[] = [{
+  // @types/plotly.js lags the runtime (colorbar.title objects, contours.z), hence the cast.
+  const data = [{
     type: 'heatmap',
     z: props.mesh,
     colorscale: 'RdBu',
     reversescale: true,
+    ...(props.range ? { zmin: props.range[0], zmax: props.range[1] } : {}),
     hovertemplate: `${t('neo_ui.plotly.row')} %{y}, ${t('neo_ui.plotly.col')} %{x}<br>%{z:.3f} ${t('neo_ui.units.mm')}<extra></extra>`,
     colorbar: {
       title: { text: t('neo_ui.units.mm'), font: { color: c.font, size: 11 } },
       tickfont: { color: c.text, size: 10 },
+      ...(props.compact ? { thickness: 12, len: 0.9 } : {}),
     },
-  }]
+  }] as unknown as Plotly.Data[]
 
   const layout: Partial<Plotly.Layout> = {
     title: { text: props.title || '', font: { color: c.font, size: 14 } },
     paper_bgcolor: c.paper,
     plot_bgcolor: c.bg,
     font: { color: c.font },
-    margin: { t: props.title ? 40 : 30, b: 50, l: 16, r: 16 },
+    margin: props.compact
+      ? { t: props.title ? 52 : 24, b: 24, l: 4, r: 4 }
+      : { t: props.title ? 40 : 30, b: 50, l: 16, r: 16 },
     annotations,
     xaxis: { visible: false, constrain: 'domain' },
     yaxis: { visible: false, scaleanchor: 'x', scaleratio: 1 },
@@ -87,7 +100,7 @@ function render() {
 
 onMounted(render)
 watch(() => props.mesh, render, { deep: true })
-watch(() => props.title, render)
+watch(() => [props.title, props.range, props.compact, props.height], render)
 
 const observer = new MutationObserver(render)
 onMounted(() => {
@@ -97,7 +110,7 @@ onUnmounted(() => observer.disconnect())
 </script>
 
 <template>
-  <div ref="chartDiv" class="heatmap-chart"></div>
+  <div ref="chartDiv" class="heatmap-chart" :style="height ? { height: height + 'px', minHeight: 0 } : undefined"></div>
 </template>
 
 <style scoped>

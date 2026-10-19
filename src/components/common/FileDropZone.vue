@@ -3,7 +3,12 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFileLoader } from '@/composables/useFileLoader'
 
-const props = defineProps<{ label?: string; accept?: string }>()
+const props = defineProps<{
+  label?: string
+  accept?: string
+  /** Short zone instead of a full-height one, for pages with content below it. */
+  compact?: boolean
+}>()
 
 const { t } = useI18n()
 const { handleDrop, handleDragOver, triggerFileInput } = useFileLoader()
@@ -21,7 +26,7 @@ function onDrop(e: DragEvent) {
 <template>
   <div
     class="dropzone"
-    :class="{ 'dropzone--active': isDragging }"
+    :class="{ 'dropzone--active': isDragging, 'dropzone--compact': compact }"
     @drop="onDrop"
     @dragover="handleDragOver"
     @dragenter="onDragEnter"
@@ -29,6 +34,7 @@ function onDrop(e: DragEvent) {
     @click="triggerFileInput(props.accept)"
   >
     <span class="dropzone-label">{{ label || t('neo_ui.common.drop_hint') }}</span>
+    <span v-if="compact && label" class="dropzone-sub">{{ t('neo_ui.common.drop_anywhere') }}</span>
   </div>
 </template>
 
@@ -50,6 +56,26 @@ function onDrop(e: DragEvent) {
 .dropzone--active {
   border-color: var(--accent-primary);
   background: rgba(74, 158, 245, 0.04);
+}
+
+.dropzone--compact {
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 200px;
+  padding: 24px;
+  border-width: 2px;
+  border-color: var(--accent-primary);
+}
+
+.dropzone--compact .dropzone-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.dropzone-sub {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .dropzone-label {

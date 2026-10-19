@@ -25,3 +25,5 @@ src/**/*.vue.js
 .env
 .env.*
 cli/.flashforge_settings.json
+
+*.tsbuildinfo

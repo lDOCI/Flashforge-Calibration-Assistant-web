@@ -2,33 +2,40 @@ import { defineStore } from 'pinia'
 import { reactive, watch } from 'vue'
 import type { CalibrationSettings } from '@/lib/calibration/types'
 
-const STORAGE_KEY = 'flashforge_settings'
+const STORAGE_KEY = 'flashforge_settings_v2'
+const LEGACY_KEY = 'flashforge_settings'
 
-function defaultSettings(): CalibrationSettings {
+export function defaultSettings(): CalibrationSettings {
   return {
     hardware: {
       screw_pitch: 0.7,
       min_adjustment: 0.02,
-      max_adjustment: 4.0,
+      max_adjustment: 2.0,
       tape_thickness: 0.06,
+      max_tape_layers: 4,
+      tape_patch_mm: 40,
       belt_tooth_mm: 0.4,
-      corner_averaging: 0,
       screw_mode: 'hold_nut',
+      bed_flex: 0.2,
+    },
+    geometry: {
+      bed_size_x: 220,
+      bed_size_y: 220,
+      shaft_front_left: [-110, -110],
+      shaft_front_right: [110, -110],
+      shaft_back: [0, 110],
+      screw_offset_x: 105,
+      screw_offset_y: 105,
     },
     thresholds: {
-      belt_threshold: 0.4,
-      screw_threshold: 0.19,
-      tape_threshold: 0.01,
+      belt_threshold: 0.15,
+      screw_threshold: 0.03,
+      tape_threshold: 0.03,
     },
     visualization: {
       interpolation_factor: 100,
       show_minutes: true,
       show_degrees: true,
-    },
-    environment: {
-      measurement_temp: 25.0,
-      target_temp: 25.0,
-      thermal_expansion_coeff: 0.0,
     },
     workflow: {
       enable_belt: true,
@@ -38,33 +45,47 @@ function defaultSettings(): CalibrationSettings {
   }
 }
 
-function loadFromStorage(): CalibrationSettings {
+function readJson(key: string): Record<string, any> | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      // Merge with defaults to handle new fields
-      const defaults = defaultSettings()
-      return {
-        hardware: { ...defaults.hardware, ...parsed.hardware },
-        thresholds: { ...defaults.thresholds, ...parsed.thresholds },
-        visualization: { ...defaults.visualization, ...parsed.visualization },
-        environment: { ...defaults.environment, ...parsed.environment },
-        workflow: { ...defaults.workflow, ...parsed.workflow },
-        thermal_model: parsed.thermal_model,
-      }
-    }
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : null
   } catch {
-    // ignore
+    return null
   }
-  return defaultSettings()
+}
+
+function loadFromStorage(): CalibrationSettings {
+  const d = defaultSettings()
+  const saved = readJson(STORAGE_KEY)
+  if (saved) {
+    return {
+      hardware: { ...d.hardware, ...saved.hardware },
+      geometry: { ...d.geometry, ...saved.geometry },
+      thresholds: { ...d.thresholds, ...saved.thresholds },
+      visualization: { ...d.visualization, ...saved.visualization },
+      workflow: { ...d.workflow, ...saved.workflow },
+    }
+  }
+  // v1 thresholds meant something else; carry over only the hardware the user set.
+  const legacy = readJson(LEGACY_KEY)
+  if (legacy?.hardware) {
+    for (const key of ['screw_pitch', 'tape_thickness', 'belt_tooth_mm', 'screw_mode'] as const) {
+      if (legacy.hardware[key] !== undefined) (d.hardware as Record<string, unknown>)[key] = legacy.hardware[key]
+    }
+  }
+  if (legacy?.workflow) Object.assign(d.workflow, legacy.workflow)
+  return d
 }
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = reactive<CalibrationSettings>(loadFromStorage())
 
   function save() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    } catch {
+      // storage unavailable (private mode); settings stay in memory
+    }
   }
 
   function reset() {
@@ -72,8 +93,7 @@ export const useSettingsStore = defineStore('settings', () => {
     save()
   }
 
-  // Auto-save on changes
-  watch(() => settings, () => save(), { deep: true })
+  watch(() => settings, save, { deep: true })
 
   return { settings, save, reset }
 })

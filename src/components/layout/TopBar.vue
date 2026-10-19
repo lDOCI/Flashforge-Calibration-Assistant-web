@@ -5,6 +5,21 @@ import { useAppStore } from '@/stores/app'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 const emit = defineEmits<{ 'toggle-menu': [] }>()
+// Absolute "/favicon.svg" breaks on GitHub Pages, where the app lives under a sub-path.
+const baseUrl = import.meta.env.BASE_URL
+
+// Tapping the logo 7 times fast is the touch-friendly way into the easter egg.
+let logoTaps = 0
+let logoTimer = 0
+function onLogoClick() {
+  clearTimeout(logoTimer)
+  if (++logoTaps >= 7) {
+    logoTaps = 0
+    window.dispatchEvent(new Event('ff-easter-egg'))
+    return
+  }
+  logoTimer = window.setTimeout(() => (logoTaps = 0), 1500)
+}
 
 function toggleTheme() {
   appStore.toggleTheme()
@@ -22,7 +37,7 @@ function toggleLang() {
       <button class="burger" @click="emit('toggle-menu')">
         <span /><span /><span />
       </button>
-      <img class="topbar-logo" src="/favicon.svg" alt="Logo" />
+      <img class="topbar-logo" :src="`${baseUrl}favicon.svg`" alt="Logo" @click="onLogoClick" />
       <span class="topbar-title">{{ t('neo_ui.top_bar.title') }}</span>
     </div>
     <div class="topbar-right">

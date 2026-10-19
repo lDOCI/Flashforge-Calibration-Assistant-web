@@ -4,8 +4,10 @@ import type { CalibrationData, CalibrationResult } from '@/lib/shaper/types'
 import { parseShaperCsv } from '@/lib/shaper/csvParser'
 import {
   calcFreqResponse,
+  calcSpectrogram,
   normalizeToFrequencies,
   findBestShaper,
+  type Spectrogram,
 } from '@/lib/shaper/shaperCalibrate'
 
 export const useShaperStore = defineStore('shaper', () => {
@@ -21,11 +23,18 @@ export const useShaperStore = defineStore('shaper', () => {
   const selectedShaperX = ref<string>('')
   const selectedShaperY = ref<string>('')
 
+  /** Only raw accelerometer CSVs have the time axis a spectrogram needs. */
+  const spectrogramX = ref<Spectrogram | null>(null)
+  const spectrogramY = ref<Spectrogram | null>(null)
+
   function loadCsv(axis: 'x' | 'y', content: string) {
     const parsed = parseShaperCsv(content)
     if (!parsed) throw new Error('Failed to parse shaper CSV')
 
     let calibData: CalibrationData
+    const spectrogram = parsed.type === 'raw' ? calcSpectrogram(parsed.data) : null
+    if (axis === 'x') spectrogramX.value = spectrogram
+    else spectrogramY.value = spectrogram
 
     if (parsed.type === 'psd') {
       calibData = parsed.data
@@ -100,6 +109,8 @@ export const useShaperStore = defineStore('shaper', () => {
     allShapersY,
     selectedShaperX,
     selectedShaperY,
+    spectrogramX,
+    spectrogramY,
     loadCsv,
     analyze,
     selectShaper,

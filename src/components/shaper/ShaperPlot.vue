@@ -35,7 +35,7 @@ function render() {
   const maxF = props.maxFreq ?? 200
 
   // Filter to maxFreq
-  const mask = freq.map(f => f <= maxF)
+  const mask = Array.from(freq, f => f <= maxF)
   const fFiltered = freq.filter((_, i) => mask[i])
   const psdSum = props.calibrationData.psdSum.filter((_, i) => mask[i])
   const psdX = props.calibrationData.psdX.filter((_, i) => mask[i])
@@ -53,7 +53,7 @@ function render() {
   let bestShaperVals: number[] | null = null
   for (const shaper of props.allShapers) {
     if (!shaper.vals || shaper.vals.length === 0) continue
-    const shaperVals = shaper.vals.filter((_, i) => mask[i])
+    const shaperVals = Array.from(shaper.vals).filter((_, i) => mask[i])
     const isSelected = shaper.name === props.selectedShaper
 
     const label = `${shaper.name.toUpperCase()} (${shaper.freq.toFixed(1)} Hz, vibr=${(shaper.vibrs * 100).toFixed(1)}%)`

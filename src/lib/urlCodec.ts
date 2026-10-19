@@ -29,11 +29,37 @@ export interface UrlPayload {
 const V3_MAGIC = 0x46   // 'F' for Flashforge
 const SCALE = 10000      // 0.0001mm precision
 
+/** Name bytes, cut to fit the uint8 length prefix without splitting a character. */
+function nameBytesOf(name: string): Uint8Array {
+  let bytes = new TextEncoder().encode(name)
+  let chars = [...name]
+  while (bytes.length > 255) {
+    chars = chars.slice(0, -1)
+    bytes = new TextEncoder().encode(chars.join(''))
+  }
+  return bytes
+}
+
+/** v3 stores counts in uint8 and consecutive deltas in int16; check both fit. */
+function fitsV3(meshes: CompactMesh[]): boolean {
+  if (meshes.length > 255) return false
+  return meshes.every(m => {
+    if (m.x > 255 || m.y > 255 || m.d.length !== m.x * m.y) return false
+    let prev = 0
+    return m.d.every(v => {
+      const q = Math.round(v * SCALE)
+      const ok = Math.abs(q - prev) <= 32767
+      prev = q
+      return ok
+    })
+  })
+}
+
 function encodeBinaryV3(meshes: CompactMesh[]): Uint8Array {
   // Calculate total size
   let size = 2 // magic + mesh count
   for (const m of meshes) {
-    const nameBytes = new TextEncoder().encode(m.n)
+    const nameBytes = nameBytesOf(m.n)
     size += 1 + nameBytes.length  // name length + name
     size += 2                      // xCount, yCount (uint8 each)
     size += 16                     // 4 × float32 bounds
@@ -49,7 +75,7 @@ function encodeBinaryV3(meshes: CompactMesh[]): Uint8Array {
   view.setUint8(off++, meshes.length)
 
   for (const m of meshes) {
-    const nameBytes = new TextEncoder().encode(m.n)
+    const nameBytes = nameBytesOf(m.n)
     view.setUint8(off++, nameBytes.length)
     u8.set(nameBytes, off)
     off += nameBytes.length
@@ -67,10 +93,7 @@ function encodeBinaryV3(meshes: CompactMesh[]): Uint8Array {
     let prev = 0
     for (const val of m.d) {
       const quantized = Math.round(val * SCALE)
-      const delta = quantized - prev
-      // Clamp to int16 range
-      const clamped = Math.max(-32768, Math.min(32767, delta))
-      view.setInt16(off, clamped, true)
+      view.setInt16(off, quantized - prev, true)
       off += 2
       prev = quantized
     }
@@ -162,13 +185,13 @@ async function collectStream(readable: ReadableStream<Uint8Array>): Promise<Uint
 /** Encode a payload for URL transfer. Uses v3 binary format for compact meshes. */
 export async function encodePayload(data: UrlPayload): Promise<string> {
   // v3 binary path for compact mesh data
-  if (data.compact && data.compact.length > 0) {
+  if (data.compact && data.compact.length > 0 && fitsV3(data.compact)) {
     const binary = encodeBinaryV3(data.compact)
     const compressed = await gzipCompress(binary)
     return uint8ToBase64url(compressed)
   }
 
-  // Fallback: JSON for v1/legacy payloads
+  // Fallback: JSON for v1/legacy payloads and meshes v3 cannot hold
   const json = JSON.stringify(data)
   const bytes = new TextEncoder().encode(json)
   const compressed = await gzipCompress(bytes)

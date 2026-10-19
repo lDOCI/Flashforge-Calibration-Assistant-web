@@ -1,7 +1,7 @@
 import Plotly from 'plotly.js-dist-min'
 
 /** Register Russian locale for Plotly UI strings */
-const ruLocale: Partial<Plotly.Locale> = {
+const ruLocale = {
   moduleType: 'locale',
   name: 'ru',
   dictionary: {

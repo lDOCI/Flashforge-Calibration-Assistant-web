@@ -11,8 +11,6 @@ const shaperStore = useShaperStore()
 const { triggerFileInput } = useFileLoader()
 
 const log = ref<string[]>([])
-const showFlashGuide = ref(true)
-const baseUrl = import.meta.env.BASE_URL
 
 function appendLog(msg: string) {
   log.value.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
@@ -70,47 +68,14 @@ function processFile(file: File) {
     <h1>{{ t('neo_ui.data.title') }}</h1>
     <p class="view-desc">{{ t('neo_ui.data.description') }}</p>
 
-    <!-- Method 1: Flash drive (stock firmware) -->
-    <div class="card">
-      <div class="card-header" @click="showFlashGuide = !showFlashGuide">
-        <div class="card-header-left">
-          <span class="method-badge">1</span>
-          <h3>{{ t('neo_ui.data.flash_title') }}</h3>
-        </div>
-        <span class="expand-icon">{{ showFlashGuide ? '−' : '+' }}</span>
-      </div>
-      <p class="hint">{{ t('neo_ui.data.flash_hint') }}</p>
-
-      <div v-if="showFlashGuide" class="flash-guide">
-        <ol class="guide-steps">
-          <li>{{ t('neo_ui.data.flash_step_1') }}</li>
-          <li>{{ t('neo_ui.data.flash_step_2') }}</li>
-          <li>{{ t('neo_ui.data.flash_step_3') }}</li>
-          <li>{{ t('neo_ui.data.flash_step_4') }}</li>
-          <li>{{ t('neo_ui.data.flash_step_5') }}</li>
-          <li>{{ t('neo_ui.data.flash_step_6') }}</li>
-        </ol>
-        <div class="guide-images">
-          <img :src="`${baseUrl}m1.jpg`" alt="Machine Info" />
-          <img :src="`${baseUrl}m2.jpg`" alt="Service Menu" />
-          <img :src="`${baseUrl}m3.jpg`" alt="Get Config" />
-        </div>
-      </div>
-
-      <div class="upload-buttons">
-        <button class="btn-action" @click="triggerFileInput('.cfg,.conf')">
-          {{ t('settings_tab.get_printer_cfg') }}
-        </button>
-        <button class="btn-action" @click="triggerFileInput('.csv')">
-          {{ t('settings_tab.get_shapers') }}
-        </button>
-      </div>
-    </div>
+    <p class="hint hint--box">
+      {{ t('neo_ui.data.no_root') }}
+      <router-link to="/">{{ t('neo_ui.data.no_root_link') }}</router-link>
+    </p>
 
     <!-- Method 2: SSH utility -->
     <div class="card">
       <div class="card-header-left">
-        <span class="method-badge">2</span>
         <h3>{{ t('neo_ui.data.ssh_title') }}</h3>
       </div>
       <p class="hint">{{ t('neo_ui.data.ssh_hint') }}</p>
@@ -125,6 +90,16 @@ function processFile(file: File) {
       </div>
 
       <pre class="ssh-paths">{{ t('neo_ui.data.ssh_paths') }}</pre>
+      <p class="hint hint--warn">{{ t('neo_ui.data.ssh_shaper_note') }}</p>
+
+      <div class="upload-buttons">
+        <button class="btn-action" @click="triggerFileInput('.cfg,.conf')">
+          {{ t('settings_tab.get_printer_cfg') }}
+        </button>
+        <button class="btn-action" @click="triggerFileInput('.csv')">
+          {{ t('settings_tab.get_shapers') }}
+        </button>
+      </div>
     </div>
 
     <!-- Log -->
@@ -327,5 +302,21 @@ h3 {
   font-size: 10px;
   color: var(--text-muted);
   padding: 1px 0;
+}
+
+.hint--warn {
+  color: var(--status-warn);
+}
+
+.hint--box {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+}
+
+.hint--box a {
+  color: var(--accent-primary);
 }
 </style>

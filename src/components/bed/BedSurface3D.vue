@@ -9,6 +9,12 @@ const props = defineProps<{
   mesh: number[][]
   title?: string
   interpolationPoints?: number
+  /** Fixed Z / colour range, so several meshes can be compared. */
+  range?: [number, number]
+  /** Tighter layout for side-by-side use: no colour bar (shared with a heatmap), camera pulled back. */
+  compact?: boolean
+  /** Fixed chart height in px. */
+  height?: number
 }>()
 
 const { t, locale } = useI18n()
@@ -70,13 +76,16 @@ function render() {
   const xVals = linspace(0, cols - 1, interpSize)
   const yVals = linspace(0, rows - 1, interpSize)
 
-  const data: Plotly.Data[] = [{
+  // @types/plotly.js lags the runtime (colorbar.title objects, contours.z), hence the cast.
+  const data = [{
     type: 'surface',
     z: interpolated,
     x: xVals,
     y: yVals,
     colorscale: 'RdBu',
     reversescale: true,
+    ...(props.range ? { cmin: props.range[0], cmax: props.range[1] } : {}),
+    showscale: !props.compact,
     contours: {
       z: { show: true, usecolormap: true, project: { z: false } },
     },
@@ -85,14 +94,14 @@ function render() {
       title: { text: t('neo_ui.units.mm'), font: { color: c.font, size: 11 } },
       tickfont: { color: c.text, size: 10 },
     },
-  }]
+  }] as unknown as Plotly.Data[]
 
   // Corner labels as 3D scatter text
   const fl = t('visual_rec.front_left')
   const fr = t('visual_rec.front_right')
   const bl = t('visual_rec.back_left')
   const br = t('visual_rec.back_right')
-  const zMin = Math.min(...props.mesh.flat()) - 0.05
+  const zMin = (props.range?.[0] ?? Math.min(...props.mesh.flat())) - 0.05
 
   data.push({
     type: 'scatter3d',
@@ -113,12 +122,15 @@ function render() {
       bgcolor: c.bg,
       xaxis: { gridcolor: c.grid, color: c.text, title: '', showticklabels: false },
       yaxis: { gridcolor: c.grid, color: c.text, title: '', showticklabels: false },
-      zaxis: { gridcolor: c.grid, color: c.text, title: { text: t('neo_ui.units.mm'), font: { color: c.text } } },
-      camera: { eye: { x: -1.5, y: -1.5, z: 1.0 } },
+      zaxis: {
+        gridcolor: c.grid, color: c.text, title: { text: t('neo_ui.units.mm'), font: { color: c.text } },
+        ...(props.range ? { range: [props.range[0] - 0.05, props.range[1] + 0.05] } : {}),
+      },
+      camera: { eye: props.compact ? { x: -1.25, y: -1.25, z: 0.85 } : { x: -1.5, y: -1.5, z: 1.0 } },
       aspectmode: 'manual',
       aspectratio: { x: 1, y: 1, z: 0.5 },
     },
-    margin: { t: props.title ? 40 : 16, b: 10, l: 10, r: 10 },
+    margin: props.compact ? { t: props.title ? 36 : 0, b: 0, l: 0, r: 0 } : { t: props.title ? 40 : 16, b: 10, l: 10, r: 10 },
   }
 
   Plotly.react(chartDiv.value, data, layout, plotlyConfig(locale.value))
@@ -126,7 +138,7 @@ function render() {
 
 onMounted(render)
 watch(() => props.mesh, render, { deep: true })
-watch(() => props.title, render)
+watch(() => [props.title, props.range, props.interpolationPoints, props.compact, props.height], render)
 
 const observer = new MutationObserver(render)
 onMounted(() => {
@@ -136,7 +148,7 @@ onUnmounted(() => observer.disconnect())
 </script>
 
 <template>
-  <div ref="chartDiv" class="surface-chart"></div>
+  <div ref="chartDiv" class="surface-chart" :style="height ? { height: height + 'px', minHeight: 0 } : undefined"></div>
 </template>
 
 <style scoped>

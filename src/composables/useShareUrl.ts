@@ -1,17 +1,5 @@
 import { useBedStore, type BedWorkspace } from '@/stores/bed'
-import { encodePayload, type UrlPayload } from '@/lib/urlCodec'
-
-/**
- * Compact mesh representation for URL sharing.
- * Uses short keys and flat arrays to minimize payload size.
- */
-interface CompactMesh {
-  n: string         // name
-  x: number         // xCount
-  y: number         // yCount
-  b: number[]       // bounds [minX, maxX, minY, maxY]
-  d: number[]       // flat matrix data (row-major), rounded to 3 decimals
-}
+import { encodePayload, type CompactMesh, type UrlPayload } from '@/lib/urlCodec'
 
 function workspaceToCompact(ws: BedWorkspace): CompactMesh {
   const m = ws.meshData
@@ -33,7 +21,7 @@ function workspaceToCompact(ws: BedWorkspace): CompactMesh {
 
 /**
  * Build a shareable URL containing all loaded bed workspaces.
- * Uses v2 compact format (mesh data only, no raw config text).
+ * Sends mesh data only, never the raw config text.
  */
 export async function buildShareUrl(): Promise<string> {
   const bedStore = useBedStore()

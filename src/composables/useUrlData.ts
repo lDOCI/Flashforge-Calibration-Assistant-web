@@ -1,6 +1,6 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { decodePayload, type CompactMesh } from '@/lib/urlCodec'
+import { decodePayload, type CompactMesh, type UrlPayload } from '@/lib/urlCodec'
 import { useBedStore } from '@/stores/bed'
 import { useShaperStore } from '@/stores/shaper'
 import type { MeshData } from '@/lib/calibration/types'
@@ -23,26 +23,31 @@ function compactToMeshData(c: CompactMesh): MeshData {
 }
 
 /** Load decoded payload into stores */
-function loadPayload(payload: any) {
+function loadPayload(payload: UrlPayload) {
   const bedStore = useBedStore()
-
-  // v2/v3 compact format — mesh data only
-  if (payload.compact && payload.compact.length > 0) {
-    for (const cm of payload.compact) {
-      const meshData = compactToMeshData(cm)
-      bedStore.loadFromMeshData(meshData, cm.n)
+  // Links come from anywhere: load what is valid and skip the rest.
+  const attempt = (what: string, fn: () => void) => {
+    try {
+      fn()
+    } catch (e) {
+      console.error(`Skipping ${what} from shared link:`, e)
     }
   }
 
+  // v2/v3 compact format — mesh data only
+  for (const cm of payload.compact ?? []) {
+    attempt(String(cm?.n), () => bedStore.loadFromMeshData(compactToMeshData(cm), String(cm.n ?? 'mesh')))
+  }
+
   // v1 / legacy formats: full config content
-  if (payload.configs || payload.meshes) {
-    const configs = payload.configs ?? payload.meshes ?? []
-    for (const cfg of configs) {
-      const content = cfg.content ?? cfg.configContent
-      const name = cfg.name ?? 'printer.cfg'
-      if (content) {
-        bedStore.loadFromConfig(content, name.replace(/\.(cfg|conf)$/, ''), name)
-      }
+  const configs = [
+    ...(payload.configs ?? []).map(c => ({ name: c.name, content: c.content })),
+    ...(payload.meshes ?? []).map(m => ({ name: m.name, content: m.configContent })),
+  ]
+  for (const cfg of configs) {
+    const name = cfg.name ?? 'printer.cfg'
+    if (cfg.content) {
+      attempt(name, () => bedStore.loadFromConfig(cfg.content, name.replace(/\.(cfg|conf)$/, ''), name))
     }
   }
 
@@ -50,7 +55,7 @@ function loadPayload(payload: any) {
     const shaperStore = useShaperStore()
     for (const csv of payload.shaperCsvs) {
       const axis = csv.axis ?? (csv.name?.toLowerCase().includes('_x') ? 'x' : 'y')
-      shaperStore.loadCsv(axis, csv.content)
+      attempt(csv.name ?? axis, () => shaperStore.loadCsv(axis, csv.content))
     }
   }
 }

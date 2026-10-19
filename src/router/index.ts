@@ -6,8 +6,10 @@ const router = createRouter({
     {
       path: '/',
       name: 'bed',
-      component: () => import('@/views/BedLevelingView.vue'),
+      component: () => import('@/views/WizardView.vue'),
     },
+    // Old links to the beta wizard
+    { path: '/wizard', redirect: '/' },
     {
       path: '/shaper',
       name: 'shaper',

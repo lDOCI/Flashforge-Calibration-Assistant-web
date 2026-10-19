@@ -7,6 +7,6 @@ declare module '*.vue' {
 }
 
 declare module 'plotly.js-dist-min' {
-  import type Plotly from 'plotly.js'
+  import Plotly = require('plotly.js')
   export = Plotly
 }
