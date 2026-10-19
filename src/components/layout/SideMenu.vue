@@ -48,7 +48,7 @@ function onAuthorClick() {
       </router-link>
     </div>
     <div class="sidemenu-footer">
-      <span class="footer-ver">v2.0</span>
+      <span class="footer-ver">v2.1</span>
       <span class="footer-author">{{ t('neo_ui.footer.author') }} <span class="author-name" @click="onAuthorClick">I_DOC_I</span></span>
       <Transition name="egg-fade">
         <div v-if="eggActive" class="egg">

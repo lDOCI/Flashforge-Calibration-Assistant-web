@@ -229,7 +229,7 @@
   },
   "about": {
     "title": "About",
-    "version": "Version 1.0",
+    "version": "Version 2.1",
     "description": "Application for analysis and calibration\nof 3D printer bed\n\n• Bed level analysis\n• Calibration recommendations\n• Input shaper analysis",
     "ok": "OK"
   },

@@ -1,4 +1,4 @@
-# Flashforge Calibration Assistant v2.0
+# Flashforge Calibration Assistant v2.1
 
 **[Open App / Открыть приложение](https://ldoci.github.io/Flashforge-Calibration-Assistant-web/)**
 
@@ -9,6 +9,16 @@ Web app for calibrating Flashforge Adventurer 5M / 5M Pro / 5X 3D printers.
 ---
 
 ## EN
+
+### What's new in 2.1
+
+- **Step-by-step leveling wizard:** one action at a time, before/after maps, re-measure and check the prediction against reality
+- **Physical model of the AD5M bed:** three belt-synced Z lead screws and a stiff plate on four springs; each stage plans from the previous one's result
+- Tape grouped into ~40 mm patches, so dense meshes give a short list
+- Compare two meshes (cold vs hot, before vs after)
+- Input Shaper spectrogram with a how-to-read guide
+- Beginner guide for getting `printer.cfg`; drop files anywhere in the window
+- Non-square meshes (7×5, 11×11, …) work
 
 ### Features
 
@@ -48,6 +58,16 @@ Upload accelerometer CSV files (`calibration_data_*.csv` from `/tmp` on the prin
 ---
 
 ## RU
+
+### Что нового в 2.1
+
+- **Пошаговый мастер выравнивания:** одно действие за раз, карты «до/после», перемер и проверка прогноза
+- **Физическая модель стола AD5M:** три вала Z на одном ремне и жёсткая плита на четырёх пружинах; каждый этап считается от результата предыдущего
+- Скотч группируется в латки ~40 мм — на плотных сетках короткий список
+- Сравнение двух карт (холодный/горячий стол, до/после)
+- Спектрограмма Input Shaper с подсказками, как её читать
+- Инструкция для новичков, как снять `printer.cfg`; файл можно бросить в любое место окна
+- Работают непрямоугольные сетки (7×5, 11×11, …)
 
 ### Возможности
 
