@@ -3,14 +3,19 @@
  *
  * Tape can only raise the surface, so the question is which level to build
  * up to. Every node height is tried as that target level: nodes below it get
- * `round(depth / thickness)` layers (capped), and the target giving the
- * smallest resulting range wins, with fewer layers as the tie-breaker.
+ * `round(depth / thickness)` layers (capped). Each layer on each patch is
+ * real work, so it has to pay for itself: the score is the resulting range
+ * plus `LAYER_COST` per layer, and the lowest score wins. Without that cost
+ * the search happily tapes most of the bed to shave off hundredths of a mm.
  *
  * `planTape` works on whatever grid it is given; the workflow hands it patch
  * heights (see `patchGrid`), not raw dense meshes. A spring-steel sheet bridges
  * small gaps, which smooths the real result slightly.
  */
 import { type Grid, rangeOf } from './grid'
+
+/** Range reduction (mm) one layer on one patch must buy to be worth sticking. */
+export const LAYER_COST = 0.005
 
 export interface TapeSpot {
   row: number
@@ -48,15 +53,14 @@ export function planTape(mesh: number[][], opts: TapeOptions): TapePlan {
   const rangeBefore = rangeOf(mesh)
   const levels = [...new Set(mesh.flat())].sort((a, b) => a - b)
 
-  let best = { layers: mesh.map(r => r.map(() => 0)), range: rangeBefore, total: 0, level: 0 }
+  let best = { layers: mesh.map(r => r.map(() => 0)), range: rangeBefore, score: rangeBefore, level: 0 }
   for (const level of levels) {
     const layers = layersFor(mesh, level, opts)
     const after = mesh.map((row, i) => row.map((v, j) => v + layers[i][j] * opts.thickness))
     const range = rangeOf(after)
     const total = layers.flat().reduce((s, n) => s + n, 0)
-    if (range < best.range - 1e-9 || (Math.abs(range - best.range) < 1e-9 && total < best.total)) {
-      best = { layers, range, total, level }
-    }
+    const score = range + LAYER_COST * total
+    if (score < best.score - 1e-9) best = { layers, range, score, level }
   }
 
   const spots: TapeSpot[] = []

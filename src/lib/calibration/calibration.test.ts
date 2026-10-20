@@ -4,7 +4,7 @@ import { gridOf, meshPlane, rangeOf, sample } from './grid'
 import { planBelts, planScrews } from './mechanics'
 import { planTape } from './tape'
 import { computeWorkflow, screwPositions, shaftPositions } from './workflow'
-import { KlipperMeshParser, validateMeshData } from '../parsers/meshParser'
+import { KlipperMeshParser, dropDuplicateMeshes, validateMeshData } from '../parsers/meshParser'
 import { defaultSettings } from '@/stores/settings'
 
 function meshFrom(f: (x: number, y: number) => number, xCount = 5, yCount = 5, min = -105, max = 105): MeshData {
@@ -194,7 +194,7 @@ describe('cell labels', () => {
 
 describe('tape on dense meshes', () => {
   it('groups a 31×31 mesh into ~40 mm patches', () => {
-    const m = meshFrom((x, y) => -0.2 * Math.exp(-((x - 40) ** 2 + (y + 30) ** 2) / 2000), 31, 31)
+    const m = meshFrom((x, y) => -0.4 * Math.exp(-((x - 40) ** 2 + (y + 30) ** 2) / 4000), 31, 31)
     const wf = computeWorkflow(m, { ...defaultSettings(), workflow: { enable_belt: false, enable_screws: false, enable_tape: true } })
     const tape = wf.stages[3]
     expect(tape.metadata.tape_cols).toBe(6)
@@ -263,5 +263,51 @@ describe('screws on real user maps', () => {
     const wf = computeWorkflow(mesh(warped), defaultSettings())
     expect(wf.stages[2].actions).toHaveLength(0)
     expect(wf.stages[3].actions.map(a => a.identifier)).toContain('A2')
+  })
+})
+
+describe('tape effort', () => {
+  const mesh = (matrix: number[][]) => ({ matrix, xCount: 5, yCount: 5, minX: -105, maxX: 105, minY: -105, maxY: 105 })
+  // printer (8).cfg from a user: after screws only two cells are worth taping.
+  const p8 = [
+    [-0.576667, -0.510833, -0.451667, -0.423333, -0.359167],
+    [-0.613333, -0.5275, -0.508333, -0.4825, -0.484167],
+    [-0.63, -0.5725, -0.5775, -0.558333, -0.594167],
+    [-0.661667, -0.6075, -0.5675, -0.571667, -0.610833],
+    [-0.601667, -0.6025, -0.581667, -0.530833, -0.588333],
+  ]
+  // printer (6).cfg, AD5M Pro: already good (0.15 mm), so little or no tape.
+  const p6 = [
+    [2.066825, 2.029419, 2.004481, 2.009469, 2.01695],
+    [2.099244, 2.09675, 2.061838, 2.0768, 2.044381],
+    [2.086775, 2.111713, 2.109219, 2.106725, 2.014456],
+    [2.09675, 2.124181, 2.1566, 2.146625, 2.074306],
+    [2.046875, 2.079294, 2.13665, 2.114206, 2.021938],
+  ]
+
+  it('does not tape most of the bed for hundredths of a mm', () => {
+    const tape8 = computeWorkflow(mesh(p8), defaultSettings()).stages[3]
+    expect(tape8.actions.length).toBeLessThanOrEqual(4)
+    const tape6 = computeWorkflow(mesh(p6), defaultSettings()).stages[3]
+    expect(tape6.actions.length).toBeLessThanOrEqual(10)
+    for (const a of tape6.actions) expect(a.metadata.layers).toBe(1)
+  })
+
+  it('every layer it does ask for buys range', () => {
+    for (const m of [p8, p6]) {
+      const tape = computeWorkflow(mesh(m), defaultSettings()).stages[3]
+      const layers = tape.actions.reduce((s, a) => s + (a.metadata.layers as number), 0)
+      expect(tape.baseline! - tape.deviation).toBeGreaterThanOrEqual(layers * 0.005 - 1e-9)
+    }
+  })
+})
+
+describe('duplicate meshes in one file', () => {
+  it('keeps one of two near-identical meshes', () => {
+    const block = (name: string, v: number) => ['#*# [bed_mesh ' + name + ']', '#*# points =',
+      ...Array.from({ length: 3 }, () => '#*# \t  ' + [v, 0, 0].map(x => x.toFixed(6)).join(', ')),
+      '#*# x_count = 3', '#*# y_count = 3', '#*# min_x = 0.0', '#*# max_x = 215.0', '#*# min_y = 0.0', '#*# max_y = 215.0'].join('\n')
+    const parsed = new KlipperMeshParser().parseAllMeshes([block('MESH_DATA', 0.1), block('MESH_DATA1', 0.103), block('OTHER', 0.5)].join('\n'))
+    expect(dropDuplicateMeshes(parsed).map(m => m.name)).toEqual(['MESH_DATA', 'OTHER'])
   })
 })

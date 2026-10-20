@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { MeshData, WorkflowData } from '@/lib/calibration/types'
 import { computeWorkflow } from '@/lib/calibration/workflow'
-import { KlipperMeshParser, validateMeshData } from '@/lib/parsers/meshParser'
+import { KlipperMeshParser, dropDuplicateMeshes, validateMeshData } from '@/lib/parsers/meshParser'
 import { useSettingsStore } from './settings'
 import { uid } from '@/lib/utils'
 
@@ -47,7 +47,7 @@ export const useBedStore = defineStore('bed', () => {
     const meshes = new KlipperMeshParser().parseAllMeshes(content)
     if (meshes.length === 0) throw new Error('Failed to parse printer.cfg — no mesh data found')
 
-    const valid = meshes.filter(m => validateMeshData(m.meshData))
+    const valid = dropDuplicateMeshes(meshes.filter(m => validateMeshData(m.meshData)))
     if (valid.length === 0) throw new Error('No valid mesh data found')
     for (const parsed of valid) {
       addWorkspace(parsed.meshData, valid.length > 1 ? `${name} (${parsed.name})` : name, sourceFile)

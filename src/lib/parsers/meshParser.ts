@@ -86,3 +86,17 @@ export function validateMeshData(m: MeshData): boolean {
       row.every(v => Number.isFinite(v) && Math.abs(v) <= 10),
   )
 }
+
+/**
+ * Drop meshes that repeat an earlier one in the same file (same grid, every
+ * point within `tolerance` mm). Configs often carry a copy such as
+ * MESH_DATA / MESH_DATA1 that differs by a rounding digit.
+ */
+export function dropDuplicateMeshes(meshes: ParsedMesh[], tolerance = 0.005): ParsedMesh[] {
+  const same = (a: MeshData, b: MeshData) =>
+    a.xCount === b.xCount &&
+    a.yCount === b.yCount &&
+    a.minX === b.minX && a.maxX === b.maxX && a.minY === b.minY && a.maxY === b.maxY &&
+    a.matrix.every((row, i) => row.every((v, j) => Math.abs(v - b.matrix[i][j]) <= tolerance))
+  return meshes.filter((m, i) => !meshes.slice(0, i).some(prev => same(prev.meshData, m.meshData)))
+}
