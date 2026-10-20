@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { MeshData } from './types'
 import { gridOf, meshPlane, rangeOf, sample } from './grid'
 import { planBelts, planScrews } from './mechanics'
-import { planTape } from './tape'
+import { patchGrid, planTape } from './tape'
+import { CELL_MM, STENCIL, boxesToStl, cellIndex, stencilBoxes } from './stencil'
 import { computeWorkflow, screwPositions, shaftPositions } from './workflow'
 import { KlipperMeshParser, dropDuplicateMeshes, validateMeshData } from '../parsers/meshParser'
 import { defaultSettings } from '@/stores/settings'
@@ -193,13 +194,13 @@ describe('cell labels', () => {
 })
 
 describe('tape on dense meshes', () => {
-  it('groups a 31×31 mesh into ~40 mm patches', () => {
+  it('groups a 31×31 mesh into the 5×5 stencil cells', () => {
     const m = meshFrom((x, y) => -0.4 * Math.exp(-((x - 40) ** 2 + (y + 30) ** 2) / 4000), 31, 31)
     const wf = computeWorkflow(m, { ...defaultSettings(), workflow: { enable_belt: false, enable_screws: false, enable_tape: true } })
     const tape = wf.stages[3]
-    expect(tape.metadata.tape_cols).toBe(6)
+    expect(tape.metadata.tape_cols).toBe(5)
     expect(tape.actions.length).toBeGreaterThan(0)
-    expect(tape.actions.length).toBeLessThanOrEqual(36)
+    expect(tape.actions.length).toBeLessThanOrEqual(25)
     expect(tape.deviation).toBeLessThan(tape.baseline!)
   })
 })
@@ -309,5 +310,53 @@ describe('duplicate meshes in one file', () => {
       '#*# x_count = 3', '#*# y_count = 3', '#*# min_x = 0.0', '#*# max_x = 215.0', '#*# min_y = 0.0', '#*# max_y = 215.0'].join('\n')
     const parsed = new KlipperMeshParser().parseAllMeshes([block('MESH_DATA', 0.1), block('MESH_DATA1', 0.103), block('OTHER', 0.5)].join('\n'))
     expect(dropDuplicateMeshes(parsed).map(m => m.name)).toEqual(['MESH_DATA', 'OTHER'])
+  })
+})
+
+describe('universal tape stencil', () => {
+  it('maps a stock AD5M 5×5 mesh one point per window', () => {
+    const m = meshFrom(() => 0)
+    const p = patchGrid(gridOf(m, 220, 220))
+    const seen = new Set(p.assign.flat().map(([r, c]) => `${r},${c}`))
+    expect(seen.size).toBe(25)
+    expect(p.assign[0][0]).toEqual([0, 0]) // front-left node → A1
+    expect(p.assign[4][4]).toEqual([4, 4]) // back-right node → E5
+  })
+
+  it('maps a corner-origin mesh (0…215) the same way', () => {
+    const m = meshFrom(() => 0, 5, 5, 0, 215)
+    const p = patchGrid(gridOf(m, 220, 220))
+    expect(new Set(p.assign.flat().map(([r, c]) => `${r},${c}`)).size).toBe(25)
+  })
+
+  it('cells line up with the printed windows', () => {
+    expect(CELL_MM).toBe(42)
+    expect(cellIndex(-105)).toBe(0)
+    expect(cellIndex(-63.1)).toBe(0)
+    expect(cellIndex(-62.9)).toBe(1)
+    expect(cellIndex(0)).toBe(2)
+    expect(cellIndex(110)).toBe(STENCIL.cells - 1)
+  })
+
+  it('produces a printable STL within the 220 mm bed', () => {
+    const boxes = stencilBoxes()
+    const stl = boxesToStl(boxes)
+    const view = new DataView(stl.buffer)
+    const tris = view.getUint32(80, true)
+    expect(tris).toBe(boxes.length * 12)
+    expect(stl.byteLength).toBe(84 + tris * 50)
+    let max = [0, 0, 0]
+    let min = [Infinity, Infinity, Infinity]
+    for (let t = 0; t < tris; t++) {
+      for (let v = 1; v <= 3; v++) {
+        for (let k = 0; k < 3; k++) {
+          const val = view.getFloat32(84 + t * 50 + v * 12 + k * 4, true)
+          max[k] = Math.max(max[k], val)
+          min[k] = Math.min(min[k], val)
+        }
+      }
+    }
+    expect(min.map(v => +v.toFixed(3))).toEqual([0, 0, 0])
+    expect(max.map(v => +v.toFixed(3))).toEqual([220, 220, 1])
   })
 })

@@ -29,6 +29,7 @@ const { handleDrop, handleDragOver, triggerFileInput } = useFileLoader()
 const { formatAction } = useActionFormat()
 
 const ws = computed(() => bedStore.activeWorkspace)
+const baseUrl = import.meta.env.BASE_URL
 const settings = computed(() => settingsStore.settings)
 
 // ---------- plan for the active measurement ----------
@@ -312,6 +313,19 @@ const maxAttemptRange = computed(() => Math.max(...attempts.value.map(a => a.ran
                   :rows="(step.metadata.tape_rows as number) ?? ws.meshData.yCount"
                   :cols="(step.metadata.tape_cols as number) ?? ws.meshData.xCount"
                 />
+              </div>
+
+              <div v-if="step.key === 'after_tape'" class="wz-stencil">
+                <div class="wz-stencil-head">
+                  <b>{{ t('neo_ui.stencil.title') }}</b>
+                  <a class="btn-ghost" :href="`${baseUrl}tape-stencil-5x5.stl`" download="tape-stencil-5x5.stl">
+                    {{ t('neo_ui.stencil.download') }}
+                  </a>
+                </div>
+                <ol>
+                  <li v-for="n in 5" :key="n">{{ t(`neo_ui.stencil.step_${n}`) }}</li>
+                </ol>
+                <p class="wz-muted">{{ t('neo_ui.stencil.hint') }}</p>
               </div>
 
               <div class="wz-pair">
@@ -725,6 +739,38 @@ h1 {
   justify-content: center;
   margin: 10px 0;
   overflow-x: auto;
+}
+
+.wz-stencil {
+  padding: 12px 14px;
+  margin: 10px 0 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+}
+
+.wz-stencil-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.wz-stencil-head a {
+  text-decoration: none;
+}
+
+.wz-stencil ol {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
 }
 
 .wz-buttons {

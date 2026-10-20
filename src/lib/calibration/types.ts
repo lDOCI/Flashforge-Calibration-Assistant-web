@@ -71,8 +71,6 @@ export interface CalibrationSettings {
     max_adjustment: number
     tape_thickness: number
     max_tape_layers: number
-    /** Size of one tape piece, mm; dense meshes are grouped into patches this big. */
-    tape_patch_mm: number
     /** Bed height change per belt tooth: leadscrew lead / pulley teeth (8 mm / 20T = 0.4). */
     belt_tooth_mm: number
     screw_mode: 'hold_nut' | 'hold_screw'

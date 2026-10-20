@@ -8,11 +8,12 @@
  * plus `LAYER_COST` per layer, and the lowest score wins. Without that cost
  * the search happily tapes most of the bed to shave off hundredths of a mm.
  *
- * `planTape` works on whatever grid it is given; the workflow hands it patch
- * heights (see `patchGrid`), not raw dense meshes. A spring-steel sheet bridges
- * small gaps, which smooths the real result slightly.
+ * `planTape` works on whatever grid it is given; the workflow hands it the
+ * stencil cell heights (see `patchGrid`), not raw meshes. A spring-steel sheet
+ * bridges small gaps, which smooths the real result slightly.
  */
 import { type Grid, rangeOf } from './grid'
+import { CELL_MM, STENCIL, cellIndex } from './stencil'
 
 /** Range reduction (mm) one layer on one patch must buy to be worth sticking. */
 export const LAYER_COST = 0.005
@@ -49,7 +50,10 @@ function layersFor(mesh: number[][], level: number, opts: TapeOptions): number[]
   )
 }
 
-export function planTape(mesh: number[][], opts: TapeOptions): TapePlan {
+export function planTape(heights: number[][], opts: TapeOptions): TapePlan {
+  // Empty cells (NaN) are treated as the highest point: never taped, never limiting.
+  const top = Math.max(...heights.flat().filter(Number.isFinite))
+  const mesh = heights.map(row => row.map(v => (Number.isFinite(v) ? v : top)))
   const rangeBefore = rangeOf(mesh)
   const levels = [...new Set(mesh.flat())].sort((a, b) => a - b)
 
@@ -80,34 +84,27 @@ export function planTape(mesh: number[][], opts: TapeOptions): TapePlan {
 }
 
 /**
- * Tape comes in pieces a few centimetres wide, so dense meshes are grouped
- * into patches of about `cellMm`. Every mesh node belongs to the nearest patch
- * centre; a patch's height is the mean of its nodes.
+ * Tape is planned on the cells of the universal printed stencil (see
+ * stencil.ts), so "C1, 2 layers" always means the same window. Every mesh
+ * node belongs to the stencil cell it lies in; a cell's height is the mean
+ * of its nodes. Cells with no nodes (mesh smaller than the bed) are never taped.
  */
 export interface PatchGrid {
   rows: number
   cols: number
-  /** Patch index [row, col] of every mesh node. */
+  /** Cell index [row, col] of every mesh node. */
   assign: [number, number][][]
-  /** Patch size, mm. */
+  /** Cell size, mm. */
   size: [number, number]
 }
 
-export function patchGrid(grid: Grid, cellMm: number): PatchGrid {
-  const count = (vals: number[]) => {
-    const span = Math.abs(vals[vals.length - 1] - vals[0])
-    return Math.min(vals.length, Math.max(2, Math.round(span / Math.max(cellMm, 1)) + 1))
-  }
-  const cols = count(grid.xs)
-  const rows = count(grid.ys)
-  const index = (vals: number[], i: number, n: number) =>
-    vals.length === n ? i : Math.round((i / (vals.length - 1)) * (n - 1))
-  const span = (vals: number[], n: number) => Math.abs(vals[vals.length - 1] - vals[0]) / Math.max(1, n - 1)
+export function patchGrid(grid: Grid): PatchGrid {
+  const [cx, cy] = grid.center
   return {
-    rows,
-    cols,
-    assign: grid.ys.map((_, i) => grid.xs.map((__, j) => [index(grid.ys, i, rows), index(grid.xs, j, cols)])),
-    size: [span(grid.xs, cols), span(grid.ys, rows)],
+    rows: STENCIL.cells,
+    cols: STENCIL.cells,
+    assign: grid.ys.map(y => grid.xs.map(x => [cellIndex(y - cy), cellIndex(x - cx)] as [number, number])),
+    size: [CELL_MM, CELL_MM],
   }
 }
 
@@ -122,7 +119,7 @@ export function patchHeights(p: PatchGrid, mesh: number[][]): number[][] {
       n[r][c]++
     }),
   )
-  return sum.map((row, r) => row.map((v, c) => (n[r][c] ? v / n[r][c] : 0)))
+  return sum.map((row, r) => row.map((v, c) => (n[r][c] ? v / n[r][c] : NaN)))
 }
 
 /** Raise every mesh node by the tape on its patch. */

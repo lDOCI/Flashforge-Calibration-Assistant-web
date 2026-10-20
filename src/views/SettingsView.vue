@@ -104,10 +104,6 @@ function resetAll() {
           <input type="number" v-model.number="s.hardware.max_tape_layers" step="1" min="1" max="10" @change="onRecompute" />
         </label>
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.hardware.tape_patch_mm') }}</span>
-          <input type="number" v-model.number="s.hardware.tape_patch_mm" step="5" min="10" @change="onRecompute" />
-        </label>
-        <label class="field">
           <span class="field-label">{{ t('neo_ui.settings.hardware.min_adjustment') }}</span>
           <input type="number" v-model.number="s.hardware.min_adjustment" step="0.01" min="0" @change="onRecompute" />
         </label>

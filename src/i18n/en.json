@@ -225,7 +225,7 @@
     },
     "screw_limit": "Some screws hit the adjustment limit — re-measure after turning and recalculate.",
     "flatness_floor": "Belts and screws can reach {value} mm at best. The rest is the shape of the plate itself; only tape fixes that.",
-    "patch_size": "Patch size ≈ {w}×{h} mm (one mesh cell)"
+    "patch_size": "Stencil cell ≈ {w}×{h} mm"
   },
   "about": {
     "title": "About",
@@ -501,8 +501,7 @@
         "hold_screw": "Hold screw, turn nut",
         "max_tape_layers": "Max tape layers",
         "min_adjustment": "Min screw adjustment (mm)",
-        "max_adjustment": "Max screw adjustment (mm)",
-        "tape_patch_mm": "Tape patch size (mm)"
+        "max_adjustment": "Max screw adjustment (mm)"
       },
       "thresholds": {
         "title": "Thresholds",
@@ -708,6 +707,16 @@
       "guide_5": "Two bands close together (e.g. 45 and 55 Hz) on CoreXY usually mean the two belts have different tension. Even them out and re-test.",
       "guide_6": "Bright spots only at certain moments, or bands above 100 Hz through the whole test, mean something rattles: a fan, a cable, a loose accelerometer or screw.",
       "guide_7": "Before re-testing, turn off the fans and check the sensor mount, or their noise ends up in the graph."
+    },
+    "stencil": {
+      "title": "Tape stencil — print it once",
+      "download": "Download stencil (STL)",
+      "step_1": "Print the stencil on the PEI sheet: PLA, 0.2 mm layers, no supports. The slicer centres it on the bed by itself.",
+      "step_2": "Peel the stencil off the PEI, then remove the PEI itself.",
+      "step_3": "Lay the stencil on the magnetic base with letters A–E towards you (front edge), centred.",
+      "step_4": "Stick tape in the windows listed above: as many pieces stacked as layers. One piece is about a window, ~39×39 mm.",
+      "step_5": "Remove the stencil, put the PEI back and take a new mesh.",
+      "hint": "Letters A–E on the stencil mark the front edge, numbers 1–5 the left edge. A1 is the front-left corner, as in the diagram above."
     }
   },
   "temperature_preset_line": "Preset: {name} ({measurement:.0f}°C → {target:.0f}°C)",

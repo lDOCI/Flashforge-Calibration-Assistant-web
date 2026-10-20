@@ -13,7 +13,6 @@ export function defaultSettings(): CalibrationSettings {
       max_adjustment: 2.0,
       tape_thickness: 0.06,
       max_tape_layers: 4,
-      tape_patch_mm: 40,
       belt_tooth_mm: 0.4,
       screw_mode: 'hold_nut',
     },
@@ -62,8 +61,8 @@ function loadFromStorage(): CalibrationSettings {
   const saved = readJson(STORAGE_KEY)
   if (saved) {
     return {
-      // bed_flex (2.1) is gone: screws only tilt the plate now.
-      hardware: { ...d.hardware, ...withoutKeys(saved.hardware, ['bed_flex']) },
+      // Dropped in 2.1: bed_flex (screws only tilt), tape_patch_mm (fixed stencil cells).
+      hardware: { ...d.hardware, ...withoutKeys(saved.hardware, ['bed_flex', 'tape_patch_mm']) },
       geometry: { ...d.geometry, ...saved.geometry },
       thresholds: { ...d.thresholds, ...saved.thresholds },
       visualization: { ...d.visualization, ...saved.visualization },

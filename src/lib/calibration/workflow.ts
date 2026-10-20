@@ -164,7 +164,7 @@ export function buildTapeStage(
   if (!s.workflow.enable_tape) return skipped('after_tape', mesh)
 
   const t = s.hardware.tape_thickness
-  const patches = patchGrid(grid, s.hardware.tape_patch_mm)
+  const patches = patchGrid(grid)
   const plan = planTape(patchHeights(patches, mesh), {
     thickness: t,
     maxLayers: s.hardware.max_tape_layers,
