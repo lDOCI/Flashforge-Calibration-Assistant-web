@@ -76,11 +76,6 @@ export interface CalibrationSettings {
     /** Bed height change per belt tooth: leadscrew lead / pulley teeth (8 mm / 20T = 0.4). */
     belt_tooth_mm: number
     screw_mode: 'hold_nut' | 'hold_screw'
-    /**
-     * 0 = the heater plate is rigid (it only tilts on its springs),
-     * 1 = fully flexible (each corner moves on its own, bilinear).
-     */
-    bed_flex: number
   }
   geometry: {
     bed_size_x: number

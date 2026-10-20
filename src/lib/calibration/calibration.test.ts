@@ -112,7 +112,7 @@ describe('bed screws', () => {
     // Ask the solver to cancel a corner that is 1 mm low: the plate cannot twist,
     // so the best it can do leaves the planar residual.
     const low = [[-1, 0], [0, 0]]
-    const plan = planScrews(grid, low, corners, { pitch: 0.7, minAdjust: 0, maxAdjust: 10, flex: 0 })
+    const plan = planScrews(grid, low, corners, { pitch: 0.7, minAdjust: 0, maxAdjust: 10 })
     // Best a rigid plate can do against a single-corner dent is ±0.25 mm.
     expect(plan.rangeAfter).toBeCloseTo(0.5, 1)
   })
@@ -121,7 +121,7 @@ describe('bed screws', () => {
     const m = meshFrom((x, y) => 0.0015 * x - 0.001 * y)
     const grid = gridOf(m, 220, 220)
     const corners = screwPositions(grid, defaultSettings().geometry)
-    const plan = planScrews(grid, m.matrix, corners, { pitch: 0.7, minAdjust: 0.02, maxAdjust: 2, flex: 0.2 })
+    const plan = planScrews(grid, m.matrix, corners, { pitch: 0.7, minAdjust: 0.02, maxAdjust: 2 })
     expect(plan.rangeAfter).toBeLessThan(0.03)
     // Lower the high side: +X is high, so right-hand screws go down.
     expect(plan.moves.front_right).toBeLessThan(0)
@@ -227,5 +227,41 @@ describe('tape cell matches the corner it came from', () => {
     [4, 4, 'E5'], // last value of last row → back-right
   ])('dip at points row %i, value %i → %s', (row, col, label) => {
     expect(tapeFor(row, col)).toEqual([label])
+  })
+})
+
+describe('screws on real user maps', () => {
+  // Reported in 2.1: screws asked for 49′ / 36′ crosswise turns on this bed.
+  const reported = [
+    [0.266, 0.425, 0.374, 0.191, -0.155],
+    [0.04, 0.169, 0.158, 0.07, -0.107],
+    [-0.061, 0.008, -0.022, -0.039, -0.118],
+    [-0.09, -0.034, -0.087, -0.117, -0.099],
+    [-0.134, -0.122, -0.158, -0.203, -0.155],
+  ]
+  const mesh = (matrix: number[][]) => ({ matrix, xCount: 5, yCount: 5, minX: -105, maxX: 105, minY: -105, maxY: 105 })
+
+  it('only tilts: no twist, front lowered and back raised', () => {
+    const screws = computeWorkflow(mesh(reported), defaultSettings()).stages[2]
+    const mm = Object.fromEntries(screws.actions.map(a => [a.identifier, (a.direction === 'clockwise' ? -1 : 1) * (a.magnitudeMm ?? 0)]))
+    const d = (k: string) => mm[k] ?? 0
+    // Planar moves: FL + BR = FR + BL (within one clock-minute of rounding).
+    expect(Math.abs(d('front_left') + d('back_right') - d('front_right') - d('back_left'))).toBeLessThan(0.03)
+    expect(d('front_left')).toBeLessThan(0)
+    expect(d('back_right')).toBeGreaterThan(0)
+    for (const a of screws.actions) expect(a.minutes!).toBeLessThan(30)
+  })
+
+  it('leaves a warped-but-level bed to tape', () => {
+    const warped = [
+      [-1.906667, -1.514167, -1.480833, -1.678333, -2.0625],
+      [-2.098333, -1.763333, -1.665833, -1.695, -1.8375],
+      [-2.0225, -1.809167, -1.755833, -1.7325, -1.709167],
+      [-1.863333, -1.7575, -1.780833, -1.729167, -1.621667],
+      [-1.725833, -1.738333, -1.8375, -1.860833, -1.6225],
+    ]
+    const wf = computeWorkflow(mesh(warped), defaultSettings())
+    expect(wf.stages[2].actions).toHaveLength(0)
+    expect(wf.stages[3].actions.map(a => a.identifier)).toContain('A2')
   })
 })

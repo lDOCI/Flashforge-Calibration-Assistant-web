@@ -136,7 +136,6 @@ export function buildScrewStage(
     pitch: h.screw_pitch,
     minAdjust: h.min_adjustment,
     maxAdjust: h.max_adjustment,
-    flex: h.bed_flex,
   })
   if (plan.rangeBefore - plan.rangeAfter < s.thresholds.screw_threshold) {
     return [stage('after_screws', mesh, mesh, []), mesh]

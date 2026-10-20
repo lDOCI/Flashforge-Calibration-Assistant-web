@@ -16,7 +16,6 @@ export function defaultSettings(): CalibrationSettings {
       tape_patch_mm: 40,
       belt_tooth_mm: 0.4,
       screw_mode: 'hold_nut',
-      bed_flex: 0.2,
     },
     geometry: {
       bed_size_x: 220,
@@ -54,12 +53,17 @@ function readJson(key: string): Record<string, any> | null {
   }
 }
 
+function withoutKeys(obj: Record<string, unknown> | undefined, keys: string[]) {
+  return Object.fromEntries(Object.entries(obj ?? {}).filter(([k]) => !keys.includes(k)))
+}
+
 function loadFromStorage(): CalibrationSettings {
   const d = defaultSettings()
   const saved = readJson(STORAGE_KEY)
   if (saved) {
     return {
-      hardware: { ...d.hardware, ...saved.hardware },
+      // bed_flex (2.1) is gone: screws only tilt the plate now.
+      hardware: { ...d.hardware, ...withoutKeys(saved.hardware, ['bed_flex']) },
       geometry: { ...d.geometry, ...saved.geometry },
       thresholds: { ...d.thresholds, ...saved.thresholds },
       visualization: { ...d.visualization, ...saved.visualization },

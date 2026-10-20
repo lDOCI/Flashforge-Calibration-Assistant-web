@@ -499,7 +499,6 @@
         "screw_mode": "Screw mode",
         "hold_nut": "Hold nut, turn screw",
         "hold_screw": "Hold screw, turn nut",
-        "bed_flex": "Plate flexibility (0 = stiff, 1 = flexible)",
         "max_tape_layers": "Max tape layers",
         "min_adjustment": "Min screw adjustment (mm)",
         "max_adjustment": "Max screw adjustment (mm)",
@@ -674,7 +673,8 @@
       "done_text": "Further steps would not gain much. Re-measure after changing the sheet or moving the printer.",
       "belt_view": "The diagram is a top view. With the printer on its back, looking at the pulleys from below, left and right are swapped — go by the shaft names. Rotation direction is given looking at the pulley from below.",
       "remove": "Remove measurement",
-      "tape_layers": "{n} layers"
+      "tape_layers": "{n} layers",
+      "screws_note": "The screws only tilt the whole bed. Bumps and dips in the plate itself are handled by tape in the next step."
     },
     "guide": {
       "title": "How do I get the bed mesh? (beginners)",

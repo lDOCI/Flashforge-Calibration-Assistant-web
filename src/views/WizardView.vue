@@ -298,6 +298,7 @@ const maxAttemptRange = computed(() => Math.max(...attempts.value.map(a => a.ran
               <p v-for="w in step.warnings" :key="w" class="wz-muted">{{ t(w) }}</p>
 
               <p v-if="step.key === 'after_belts'" class="wz-muted">{{ t('neo_ui.wizard.belt_view') }}</p>
+              <p v-if="step.key === 'after_screws'" class="wz-muted">{{ t('neo_ui.wizard.screws_note') }}</p>
               <div class="wz-diagram">
                 <BeltDiagram v-if="step.key === 'after_belts'" :actions="step.actions" />
                 <ScrewDiagram

@@ -116,10 +116,6 @@ function resetAll() {
           <input type="number" v-model.number="s.hardware.max_adjustment" step="0.1" min="0.1" @change="onRecompute" />
         </label>
         <label class="field">
-          <span class="field-label">{{ t('neo_ui.settings.hardware.bed_flex') }}</span>
-          <input type="number" v-model.number="s.hardware.bed_flex" step="0.05" min="0" max="1" @change="onRecompute" />
-        </label>
-        <label class="field">
           <span class="field-label">{{ t('neo_ui.settings.hardware.screw_mode') }}</span>
           <select v-model="s.hardware.screw_mode" @change="onSettingsChange">
             <option value="hold_nut">{{ t('neo_ui.settings.hardware.hold_nut') }}</option>

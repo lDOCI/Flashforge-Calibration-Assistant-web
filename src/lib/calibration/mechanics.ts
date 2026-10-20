@@ -7,8 +7,9 @@
  *   Three points define a plane, so the carriage simply tilts.
  * - The heater plate sits on four springs over load cells, one nut/screw per
  *   corner. A stiff plate on four soft springs settles on the least-squares
- *   plane through the four support heights; a flexible plate follows each
- *   corner on its own. `bed_flex` blends the two.
+ *   plane through the four support heights, so the screws can only tilt it.
+ *   Turning them "crosswise" (a twist) just loads one spring and unloads
+ *   another; the plate's own bumps and dips are left to tape.
  *
  * Mesh values follow Klipper: a higher value means the bed surface is higher
  * at that point. Every function here works in mm and printer coordinates.
@@ -35,24 +36,6 @@ function planarResponses(grid: Grid, supports: Point[]): number[][][] {
     const unit = supports.map((__, i) => (i === k ? 1 : 0))
     return sample(grid, fitPlane(supports, unit))
   })
-}
-
-/** Bilinear response of four corner supports ordered FL, FR, BL, BR. */
-function bilinearResponses(grid: Grid, corners: Point[]): number[][][] {
-  const [fl, fr, bl] = corners
-  const x0 = fl[0]
-  const x1 = fr[0]
-  const y0 = fl[1]
-  const y1 = bl[1]
-  const weights = [
-    (u: number, v: number) => (1 - u) * (1 - v),
-    (u: number, v: number) => u * (1 - v),
-    (u: number, v: number) => (1 - u) * v,
-    (u: number, v: number) => u * v,
-  ]
-  return weights.map(w =>
-    sample(grid, (x, y) => w((x - x0) / (x1 - x0), (y - y0) / (y1 - y0))),
-  )
 }
 
 function applyMoves(mesh: number[][], responses: number[][][], moves: number[]): number[][] {
@@ -115,7 +98,6 @@ export interface ScrewOptions {
   pitch: number
   minAdjust: number
   maxAdjust: number
-  flex: number
 }
 
 export interface ScrewPlan {
@@ -130,18 +112,14 @@ export interface ScrewPlan {
 }
 
 /**
- * Least-squares screw moves with a small penalty on the moves themselves, so
- * the solver prefers small turns split between corners. The common offset is
+ * Least-squares screw moves for a rigid plate, with a small penalty on the
+ * moves themselves: the smallest moves that give the best tilt, which are
+ * planar (no twist the plate would not follow). The common offset is
  * free (it only shifts Z). Moves below `minAdjust` are dropped and moves over
  * `maxAdjust` are clamped, re-solving the rest each time.
  */
 export function planScrews(grid: Grid, mesh: number[][], corners: Point[], opts: ScrewOptions): ScrewPlan {
-  const rigid = planarResponses(grid, corners)
-  const flexible = bilinearResponses(grid, corners)
-  const k = Math.min(1, Math.max(0, opts.flex))
-  const responses = rigid.map((r, i) =>
-    r.map((row, a) => row.map((v, b) => (1 - k) * v + k * flexible[i][a][b])),
-  )
+  const responses = planarResponses(grid, corners)
 
   const flat = (m: number[][]) => m.flat()
   const cols = responses.map(flat)
