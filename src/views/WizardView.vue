@@ -70,7 +70,7 @@ function toggle(step: StageResult) {
   openKey.value = openKey.value === step.key ? null : step.key
 }
 
-/** Tape cells grouped by layer count, thickest first: "4 layers: 1A, 2B". */
+/** Tape cells grouped by layer count, thickest first: "4 layers: A1, B2". */
 function tapeGroups(step: StageResult) {
   const groups = new Map<number, string[]>()
   const pos = (a: StageResult['actions'][number]) =>

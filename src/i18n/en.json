@@ -624,7 +624,8 @@
         "instr_1": "Take aluminium tape (~0.06 mm thick)",
         "instr_2": "Cut pieces to match the size of the highlighted cells",
         "instr_3": "Stick the indicated number of layers at each position",
-        "instr_4": "Re-measure the mesh to verify the result"
+        "instr_4": "Re-measure the mesh to verify the result",
+        "naming_hint": "Cell \"A1\" is the front-left corner: the letter is the column from the left, the number is the row from the front edge."
       }
     },
     "compare": {

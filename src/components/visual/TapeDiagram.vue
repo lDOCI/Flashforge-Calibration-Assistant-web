@@ -21,11 +21,12 @@ const grid = computed(() => {
     let row = action.metadata?.row as number | undefined
     let col = action.metadata?.col as number | undefined
     if (row === undefined || col === undefined) {
-      // Older actions only carry a label like "2B" → row=1, col=1
-      const match = action.identifier.match(/^(\d+)([A-Z])$/)
-      if (!match) continue
-      row = parseInt(match[1]) - 1
-      col = match[2].charCodeAt(0) - 65
+      // Older actions only carry a label: "B2" (or legacy "2B") → row=1, col=1
+      const m = action.identifier.match(/^([A-Z])(\d+)$/) ?? action.identifier.match(/^(\d+)([A-Z])$/)
+      if (!m) continue
+      const [letter, num] = /\d/.test(m[1]) ? [m[2], m[1]] : [m[1], m[2]]
+      row = parseInt(num) - 1
+      col = letter.charCodeAt(0) - 65
     }
     if (row >= 0 && row < props.rows && col >= 0 && col < props.cols) {
       g[row][col] = (action.metadata?.layers as number) ?? 1
@@ -43,6 +44,13 @@ const colLabels = computed(() => {
   return Array.from({ length: props.cols }, (_, i) => String(i + 1))
 })
 
+/** Rows drawn back-to-front, so the front of the bed is at the bottom like every other view. */
+const displayRows = computed(() => grid.value.map((cells, ri) => ({ ri, cells })).reverse())
+
+function cellName(ri: number, ci: number): string {
+  return props.cols <= 26 ? `${colLabels.value[ci]}${ri + 1}` : `${ci + 1}:${ri + 1}`
+}
+
 // For large grids, shrink cells
 const isLargeGrid = computed(() => props.cols > 12 || props.rows > 12)
 
@@ -57,9 +65,36 @@ function cellColor(layers: number | null): string {
 <template>
   <div class="tape-diagram">
     <div class="tape-grid-wrapper" :class="{ 'tape-grid-wrapper--large': isLargeGrid }">
-      <!-- Column headers -->
+      <div class="side-label">{{ t('visual_rec.top_view') }} · {{ t('visual_rec.back_label') }}</div>
+      <div class="corner-labels">
+        <span>{{ t('visual_rec.back_left') }}</span>
+        <span>{{ t('visual_rec.back_right') }}</span>
+      </div>
+      <!-- Grid with row headers -->
       <div
-        class="col-headers"
+        class="grid-body"
+        :style="{ gridTemplateColumns: `28px repeat(${cols}, 1fr)` }"
+      >
+        <template v-for="{ ri, cells } in displayRows" :key="ri">
+          <!-- Row number, counted from the front -->
+          <div class="grid-label row-label" :class="{ 'grid-label--small': isLargeGrid }">{{ ri + 1 }}</div>
+          <!-- Cells -->
+          <div
+            v-for="(cell, ci) in cells"
+            :key="`${ri}-${ci}`"
+            class="tape-cell"
+            :class="{ 'tape-cell--small': isLargeGrid }"
+            :style="{ background: cellColor(cell) }"
+            :title="cellName(ri, ci)"
+          >
+            <span v-if="cell !== null" class="tape-layers" :class="{ 'tape-layers--small': isLargeGrid }">{{ cell }}</span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Column letters under the grid, chess-style -->
+      <div
+        class="col-headers col-headers--bottom"
         :style="{ gridTemplateColumns: `28px repeat(${cols}, 1fr)` }"
       >
         <div></div>
@@ -70,28 +105,12 @@ function cellColor(layers: number | null): string {
           :class="{ 'grid-label--small': isLargeGrid }"
         >{{ label }}</div>
       </div>
-
-      <!-- Grid with row headers -->
-      <div
-        class="grid-body"
-        :style="{ gridTemplateColumns: `28px repeat(${cols}, 1fr)` }"
-      >
-        <template v-for="(row, ri) in grid" :key="ri">
-          <!-- Row number -->
-          <div class="grid-label row-label" :class="{ 'grid-label--small': isLargeGrid }">{{ ri + 1 }}</div>
-          <!-- Cells -->
-          <div
-            v-for="(cell, ci) in row"
-            :key="`${ri}-${ci}`"
-            class="tape-cell"
-            :class="{ 'tape-cell--small': isLargeGrid }"
-            :style="{ background: cellColor(cell) }"
-            :title="`${ri + 1}${colLabels[ci]}`"
-          >
-            <span v-if="cell !== null" class="tape-layers" :class="{ 'tape-layers--small': isLargeGrid }">{{ cell }}</span>
-          </div>
-        </template>
+      <div class="corner-labels">
+        <span>{{ t('visual_rec.front_left') }}</span>
+        <span>{{ t('visual_rec.front_right') }}</span>
       </div>
+      <div class="side-label side-label--front">{{ t('visual_rec.front_label') }}</div>
+      <p class="naming-hint">{{ t('neo_ui.visual.tape.naming_hint') }}</p>
     </div>
     <div v-if="actions.length === 0" class="no-tape">{{ t('visual_rec.tape_correction_not_needed') }}</div>
 
@@ -125,6 +144,40 @@ function cellColor(layers: number | null): string {
 .tape-grid-wrapper--large {
   max-width: 100%;
   min-width: unset;
+}
+
+.side-label {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.side-label--front {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.corner-labels {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 30px;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 2px 0;
+}
+
+.col-headers--bottom {
+  margin: 2px 0 0;
+}
+
+.naming-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
 }
 
 .col-headers {

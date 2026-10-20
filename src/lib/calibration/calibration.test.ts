@@ -183,10 +183,12 @@ describe('workflow', () => {
 })
 
 describe('cell labels', () => {
-  it('uses letters up to 26 columns and row:col beyond', async () => {
+  it('labels cells chess-style: column letter + row from the front', async () => {
     const { cellLabel } = await import('./workflow')
-    expect(cellLabel(1, 1, 5)).toBe('2B')
-    expect(cellLabel(28, 29, 40)).toBe('29:30')
+    expect(cellLabel(0, 0, 5)).toBe('A1')
+    expect(cellLabel(4, 4, 5)).toBe('E5')
+    expect(cellLabel(1, 1, 5)).toBe('B2')
+    expect(cellLabel(28, 29, 40)).toBe('30:29')
   })
 })
 
@@ -199,5 +201,31 @@ describe('tape on dense meshes', () => {
     expect(tape.actions.length).toBeGreaterThan(0)
     expect(tape.actions.length).toBeLessThanOrEqual(36)
     expect(tape.deviation).toBeLessThan(tape.baseline!)
+  })
+})
+
+describe('tape cell matches the corner it came from', () => {
+  // Klipper writes points row by row starting at min_y (front), each row from min_x (left).
+  // So the FIRST number of the FIRST points row is the front-left probe point.
+  const cfgWithDip = (row: number, col: number) => {
+    const rows = Array.from({ length: 5 }, (_, r) =>
+      '#*# \t  ' + Array.from({ length: 5 }, (_, c) => (r === row && c === col ? -0.2 : 0).toFixed(6)).join(', '),
+    )
+    return ['#*# [bed_mesh default]', '#*# points =', ...rows, '#*# x_count = 5', '#*# y_count = 5',
+      '#*# min_x = -105.0', '#*# max_x = 105.0', '#*# min_y = -105.0', '#*# max_y = 105.0'].join('\n')
+  }
+  const tapeFor = (row: number, col: number) => {
+    const mesh = new KlipperMeshParser().parseAllMeshes(cfgWithDip(row, col))[0].meshData
+    const s = { ...defaultSettings(), workflow: { enable_belt: false, enable_screws: false, enable_tape: true } }
+    return computeWorkflow(mesh, s).stages[3].actions.map(a => a.identifier)
+  }
+
+  it.each([
+    [0, 0, 'A1'], // first value of first row → front-left
+    [0, 4, 'E1'], // last value of first row → front-right
+    [4, 0, 'A5'], // first value of last row → back-left
+    [4, 4, 'E5'], // last value of last row → back-right
+  ])('dip at points row %i, value %i → %s', (row, col, label) => {
+    expect(tapeFor(row, col)).toEqual([label])
   })
 })

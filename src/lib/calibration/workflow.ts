@@ -46,11 +46,12 @@ const STAGE_TEXT: Record<Exclude<StageKey, 'initial'>, { label: string; descript
 }
 
 /**
- * Grid label of a node, e.g. "2B" = second row from the front, column B.
- * Meshes wider than 26 columns run out of letters, so they use "row:col".
+ * Chess-style label of a cell: letter = column from the left, number = row
+ * from the front. "A1" is front-left, "E5" back-right on a 5×5 grid.
+ * Grids wider than 26 columns run out of letters and use "column:row".
  */
 export function cellLabel(row: number, col: number, cols: number): string {
-  return cols <= 26 ? `${row + 1}${String.fromCharCode(65 + col)}` : `${row + 1}:${col + 1}`
+  return cols <= 26 ? `${String.fromCharCode(65 + col)}${row + 1}` : `${col + 1}:${row + 1}`
 }
 
 function stage(
